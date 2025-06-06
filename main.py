@@ -13,34 +13,30 @@ with open("messages.json", encoding='utf-8') as ofile:
 load_dotenv()
 TG_TOKEN = os.environ.get("TG_TOKEN")
 LLM_TOKEN = os.environ.get("LLM_TOKEN")
-DEBUG = bool(os.environ.get("DEBUG"))
+DEBUG = bool(int(os.environ.get("DEBUG")))
 DEBUG_CHAT = int(os.environ.get("DEBUG_CHAT"))
 DATABASE_NAME = os.environ.get("DATABASE_NAME")
-
+TABLE_NAME =  os.environ.get("TABLE_NAME")
 
 bot = Bot(token = TG_TOKEN)
 dp = Dispatcher()
 
 async def check_db():
-    """Проверяет и создает базу данных и таблицу, если они не существуют."""
-    try:  # Добавляем обработку исключений
-        async with aiosqlite.connect(DATABASE_NAME) as db:
-            async with db.cursor() as cursor:
-                await cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS users (
-                        id INTEGER PRIMARY KEY, 
-                        name TEXT NOT NULL,
-                        sub_lvl INTEGER,
-                        is_admin INTEGER
-                    )
-                """
+    async with aiosqlite.connect(DATABASE_NAME) as db:
+        async with db.cursor() as cursor:
+            await cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+                    id INTEGER PRIMARY KEY,  --  ID is now the PRIMARY KEY and NOT AUTOINCREMENT
+                    name TEXT,
+                    sub_lvl INTEGER,
+                    sub_period INTEGER,
+                    is_admin INTEGER
                 )
-            await db.commit()
-        return "База данных в порядке"
-    except aiosqlite.Error as e:
-        return f"Ошибка при проверке/создании базы данных: {e}"
-
+                """
+            )
+        await db.commit()
+        return "Бд подгружена успешно"
 
 async def f_debug(message_chat_id, message_id):
     if DEBUG:
@@ -55,6 +51,16 @@ async def cmd_answer(message: types.Message):
     sent_msg = await message.answer(MESSAGES["msg_start"], reply_markup=builder.as_markup())
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
+
+@dp.message()
+async def cmd_answer(message: types.Message):
+    builder = ReplyKeyboardBuilder()
+    builder.button(text=MESSAGES["btn_main_menu_sub"])
+    builder.button(text=MESSAGES["btn_main_menu_profile"])
+    sent_msg = await message.answer(MESSAGES["msg_start"], reply_markup=builder.as_markup())
+    await f_debug(message.chat.id, message.message_id)
+    await f_debug(message.chat.id, sent_msg.message_id)
+
 
 
 @dp.message(F.text.lower())
@@ -83,5 +89,6 @@ async def main():
     print(db_status) 
     print("Start success")
     await dp.start_polling(bot)
+
 if __name__ == "__main__":
     asyncio.run(main())
