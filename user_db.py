@@ -1,8 +1,10 @@
 import aiosqlite
 import os
 import asyncio
+import json 
 from dotenv import load_dotenv
-import json
+from datetime import datetime, timedelta
+
 
 load_dotenv()
 LLM_TOKEN = os.environ.get("LLM_TOKEN")
@@ -19,6 +21,7 @@ class User:
         id,
         name=None,
         prompt=[],
+        remind_of_yourself= "2077-06-15 22:03:51",  
         sub_lvl=0,
         sub_id=0,
         sub_period=-1,
@@ -27,28 +30,30 @@ class User:
         self.id = id
         self.name = name
         self.prompt = prompt
+        self.remind_of_yourself = remind_of_yourself
         self.sub_lvl = sub_lvl
         self.sub_id = sub_id
         self.sub_period = sub_period
         self.is_admin = is_admin
 
     def __repr__(self):
-        return f"User(id={self.id}, \n name={self.name}, \n prompt={self.prompt}, \n sub_lvl={self.sub_lvl}, \n sub_id={self.sub_id}, \n sub_period={self.sub_period}, \n is_admin={self.is_admin})"
+        return f"User(id={self.id}, \n name={self.name}, \n prompt={self.prompt}, \n remind_of_yourself={self.remind_of_yourself}, \n sub_lvl={self.sub_lvl}, \n sub_id={self.sub_id}, \n sub_period={self.sub_period}, \n is_admin={self.is_admin})"
 
     async def get_from_db(self):
         async with aiosqlite.connect(DATABASE_NAME) as db:
             cursor = await db.cursor()
             sql = f"SELECT * FROM {TABLE_NAME} WHERE id = ?"
             await cursor.execute(sql, (self.id,))
-            row = list(await cursor.fetchone())
+            row = await cursor.fetchone()
             if row:
                 self.id = row[0]
                 self.name = row[1]
                 self.prompt = json.loads(row[2])
-                self.sub_lvl = row[3]
-                self.sub_id = row[4]
-                self.sub_period = row[5]
-                self.is_admin = row[6]
+                self.remind_of_yourself = row[3]  
+                self.sub_lvl = row[4]
+                self.sub_id = row[5]
+                self.sub_period = row[6]
+                self.is_admin = row[7]
 
     async def __call__(self, user_id):
         async with aiosqlite.connect(DATABASE_NAME) as db:
@@ -61,10 +66,11 @@ class User:
                     id=row[0],
                     name=row[1],
                     prompt=json.loads(row[2]),
-                    sub_lvl=row[3],
-                    sub_id=row[4],
-                    sub_period=row[5],
-                    is_admin=row[6],
+                    remind_of_yourself=row[3], 
+                    sub_lvl=row[4],
+                    sub_id=row[5],
+                    sub_period=row[6],
+                    is_admin=row[7],
                 )
                 return user
             else:
@@ -74,13 +80,14 @@ class User:
         async with aiosqlite.connect(DATABASE_NAME) as db:
             cursor = await db.cursor()
             sql_insert = f"""
-                        INSERT INTO {TABLE_NAME} (id, name, prompt, sub_lvl, sub_id, sub_period, is_admin)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO {TABLE_NAME} (id, name, prompt, remind_of_yourself, sub_lvl, sub_id, sub_period, is_admin)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """
             values = (
                 self.id,
                 self.name,
                 json.dumps(self.prompt),
+                self.remind_of_yourself, 
                 self.sub_lvl,
                 self.sub_id,
                 self.sub_period,
@@ -101,12 +108,13 @@ class User:
             cursor = await db.cursor()
             sql_query = f"""
                 UPDATE {TABLE_NAME}
-                SET name = ?, prompt = ?, sub_lvl = ?, sub_id = ?, sub_period = ?, is_admin = ?
+                SET name = ?, prompt = ?, remind_of_yourself = ?, sub_lvl = ?, sub_id = ?, sub_period = ?, is_admin = ?
                 WHERE id = ?
             """
             values = (
                 self.name,
                 json.dumps(self.prompt),
+                self.remind_of_yourself, 
                 self.sub_lvl,
                 self.sub_id,
                 self.sub_period,
@@ -117,7 +125,6 @@ class User:
             await db.commit()
             await cursor.close()
 
-
 async def check_db():
     async with aiosqlite.connect(DATABASE_NAME) as db:
         async with db.cursor() as cursor:
@@ -127,6 +134,7 @@ async def check_db():
                     id INTEGER PRIMARY KEY,  --  ID is now the PRIMARY KEY and NOT AUTOINCREMENT
                     name TEXT,
                     prompt JSON,
+                    remind_of_yourself TEXT,
                     sub_lvl INTEGER,
                     sub_id TEXT,
                     sub_period INTEGER,
@@ -149,15 +157,40 @@ async def user_exists(user_id):
 
     return bool(result)
 
+async def time_after(after_an):
+    now = datetime.now()
+    future_time = now + timedelta(hours=5)
+    formatted_future_time = future_time.strftime("%Y-%m-%d %H:%M:%S")
+    return formatted_future_time
+    
+async def get_past_dates():
+    past_user_ids = []
+    async with aiosqlite.connect(DATABASE_NAME) as db:
+        async with db.execute("PRAGMA journal_mode=WAL;") as cursor:
+            await cursor.fetchone()
+
+        now = datetime.now()
+
+        query = f"SELECT {"id"}, {"remind_of_yourself"} FROM {TABLE_NAME}"
+
+        async with db.execute(query) as cursor:
+            results = await cursor.fetchall()
+
+        for row in results:
+            user_id = row[0]  
+            date_str = row[1]
+            date_from_db = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+            if date_from_db < now:
+                past_user_ids.append(user_id) 
+
+    return past_user_ids
+
+
+
 
 async def main():
-    Test = User(1433319219)
-    await Test.get_from_db()
-    print(Test)
-    await Test.update_prompt("user", "мяу")
-    print(Test)
-    await Test.update_in_db()
-    print(await Test(1433319219))
+    print(await get_past_dates())
+    
 
 
 if __name__ == "__main__":
