@@ -1,12 +1,15 @@
 import aiohttp
 import json
+import asyncio
 import os
+import requests
 from dotenv import load_dotenv
 
 
 load_dotenv()
 LLM_TOKEN = os.environ.get("LLM_TOKEN")
 MODEL = os.environ.get("MODEL")
+
 
 async def send_request_to_openrouter(
     prompt,
@@ -24,8 +27,6 @@ async def send_request_to_openrouter(
                 response.raise_for_status()
                 response_text = await response.text()  
                 response_json = json.loads(response_text) 
-
-
                 if "choices" in response_json and len(response_json["choices"]) > 0:
                     return response_json["choices"][0]["message"]["content"]
                 else:
@@ -38,5 +39,8 @@ async def send_request_to_openrouter(
     except json.JSONDecodeError as e:
         print(f"Error decoding JSON response: {e}")
         return None
-if __name__ == "__main__":
+async def main():
     pass
+
+if __name__ == "__main__":
+    asyncio.run(main())

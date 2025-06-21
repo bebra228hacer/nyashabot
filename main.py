@@ -62,6 +62,16 @@ class UserHaveSubLevel(Filter):
         else:
             return False
 
+class UserIsAdmin(Filter):
+    async def __call__(self, message: types.Message) -> bool:
+        user = User(message.chat.id)
+        await user.get_from_db()
+        if user:
+            return user.sub_lvl >= self.required_sub_lvl
+        else:
+            return False
+
+
 
 @dp.message(F.chat.id == DEBUG_CHAT)
 async def test(message):
@@ -145,7 +155,7 @@ async def reminder():
         await user.get_from_db()
         prompt_for_request = user.prompt.copy()
         prompt_for_request.append({"role": "system", "content": REMINDER_PROMPT})
-        llc_msg = send_request_to_openrouter(prompt_for_request)
+        llc_msg = await send_request_to_openrouter(prompt_for_request)
         try:
             sent_msg = await bot.send_message(
             chat_id=id, text=llc_msg,
