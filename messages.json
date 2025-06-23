@@ -3,10 +3,9 @@
     
     "btn_main_menu_sub":"Подписка",
     "msg_sub":"Твой уровень подписки - {sub_lvl}, чтобы его поменять, можешь воспользоваться кнопками",
-    "btn_main_menu_profile":"Анкета"
-
-
-
-
+    "btn_main_menu_profile":"Анкета",
+    "adminka_profile":"Профили пользователей",
+    "adminka_dispatch":"Сообщение от админа",
+    "adminka_back":"Назад"
 
 }
