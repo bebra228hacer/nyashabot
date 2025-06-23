@@ -24,6 +24,7 @@ DEBUG = bool(int(os.environ.get("DEBUG")))
 DEBUG_CHAT = int(os.environ.get("DEBUG_CHAT"))
 DATABASE_NAME = os.environ.get("DATABASE_NAME")
 TABLE_NAME = os.environ.get("TABLE_NAME")
+DELAYED_REMINDERS = os.environ.get("DELAYED_REMINDERS")
 with open("prompts.json", encoding="utf-8") as ofile:
     PROMPTS = json.load(ofile)
     DEFAULT_PROMPT = PROMPTS["DEFAULT_PROMPT"]
@@ -126,7 +127,7 @@ async def LLC_request(message: types.Message):
     await user.update_prompt("user", message.text)
     prompt_for_request = user.prompt.copy()
     prompt_for_request.append({"role": "system", "content": DEFAULT_PROMPT})
-    llc_msg = send_request_to_openrouter(prompt_for_request)
+    llc_msg = await send_request_to_openrouter(prompt_for_request)
 
     try:
         await bot.edit_message_text(llc_msg, chat_id=message.chat.id, message_id=generating_message.message_id, parse_mode=ParseMode.MARKDOWN_V2)
@@ -143,7 +144,7 @@ async def LLC_request(message: types.Message):
         return
 
     await user.update_prompt("assistant", generating_message.text)
-    user.remind_of_yourself = await user_db.time_after(5)
+    user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS)
     await user.update_in_db()
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, generating_message.message_id)
