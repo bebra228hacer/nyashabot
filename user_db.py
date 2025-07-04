@@ -12,7 +12,7 @@ DEBUG = bool(os.environ.get("DEBUG"))
 DEBUG_CHAT = int(os.environ.get("DEBUG_CHAT"))
 DATABASE_NAME = os.environ.get("DATABASE_NAME")
 TABLE_NAME = os.environ.get("TABLE_NAME")
-MAX_CONTEXT = os.environ.get("MAX_CONTEXT")
+MAX_CONTEXT = int(os.environ.get("MAX_CONTEXT"))
 
 
 class User:
@@ -100,8 +100,8 @@ class User:
     async def update_prompt(self, role, new_request):
         new_entry = {"role": role, "content": new_request}
         self.prompt.append(new_entry)
-        if len(self.prompt) > 15:
-            self.prompt = self.prompt[-15:]
+        if len(self.prompt) > MAX_CONTEXT:
+            self.prompt = self.prompt[-MAX_CONTEXT:]
 
     async def update_in_db(self):
         async with aiosqlite.connect(DATABASE_NAME) as db:
