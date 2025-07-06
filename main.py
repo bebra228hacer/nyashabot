@@ -68,8 +68,15 @@ class UserIsAdmin(Filter):
         else:
             return False
 
+class OldMessage(Filter):
+    async def __call__(self, message: types.Message) -> bool:
+        now = datetime.datetime.now(tz=datetime.timezone.utc)  
+        message_time = message.date.replace(tzinfo=datetime.timezone.utc) 
+        time_difference = now - message_time
+        return time_difference >= datetime.timedelta(minutes=1)
 
-async def console_log(owner, text, entered_text=""):
+
+async def console_log(owner, text, entered_text="", cut_back = True, state = True):
     text = text.replace('\n', ' ')
     text = text.replace('\r', ' ')
     text = re.sub(r'\s+', ' ', text).strip()
@@ -77,9 +84,13 @@ async def console_log(owner, text, entered_text=""):
     entered_text = entered_text.replace('\r', ' ')
     entered_text = re.sub(r'\s+', ' ', entered_text).strip()
     debug_string = f'[{datetime.datetime.now().strftime("%H.%M.%S")}|{owner}] >> {text}'
-    if entered_text:
+    if entered_text and cut_back:
         entered_text = entered_text[:50]
         debug_string = f'{debug_string}:"{entered_text}..."'
+    elif entered_text:
+        debug_string = f'{debug_string}:"{entered_text}..."'
+    else:
+        pass
     print(debug_string)
 
 async def f_debug(message_chat_id, message_id):
@@ -95,11 +106,23 @@ async def test(message):
     pass
 
 
+
+
+@dp.message(OldMessage())
+async def spam(message):
+    #print("пуньк")
+    pass
+
+
+
+
 @dp.message(UserNotInDB())
-async def test(message):
+async def registration(message):
     user = message.from_user
-    if user and user.username:
+    if user and user.username!=None:
         username = user.username
+    else:
+        username = "Not_of_registration"
     user = User(int(message.chat.id), username)
     await user.save_for_db()
     builder = ReplyKeyboardBuilder()
@@ -164,7 +187,15 @@ async def LLC_request(message: types.Message):
     prompt_for_request = user.prompt.copy()
     prompt_for_request.append({"role": "system", "content": DEFAULT_PROMPT})
     llc_msg = await send_request_to_openrouter(prompt_for_request)
-    llc_msg = llc_msg.replace("#", "")
+    await user.update_prompt("assistant", llc_msg)
+    await console_log(f"send_request_to_openrouter_raw_output", llc_msg, state = False)
+    llc_msg = llc_msg.replace("**","*")
+    llc_msg = llc_msg.replace("***","*")
+    llc_msg = llc_msg.replace("****","*")
+    llc_msg = llc_msg.replace("#","")
+    pattern = '[' + re.escape(r'[]()>\#+\-={}.!') + ']'
+    llc_msg = re.sub(pattern, r'\\\g<0>', llc_msg) 
+    await console_log(f"send_request_to_openrouter_output", llc_msg, state=False)
     try:
         generating_message = await bot.edit_message_text(
             llc_msg,
@@ -173,8 +204,8 @@ async def LLC_request(message: types.Message):
             parse_mode=ParseMode.MARKDOWN_V2,
         )
     except TelegramBadRequest as e:
-        llc_msg = re.sub(r"(\*\*|\_\_|\~\~)", r"\\\g<1>", llc_msg)
-        llc_msg = re.sub(r"([\[\]()>\#\+\=\-\.!\`\|\{\}])", r"\\\g<1>", llc_msg)
+        pattern = '[' + re.escape(r'_*~`|') + ']'
+        llc_msg = re.sub(pattern, r'\\\g<0>', llc_msg) 
         try:
             generating_message = await bot.edit_message_text(
                 llc_msg,
@@ -196,12 +227,11 @@ async def LLC_request(message: types.Message):
             message_id=generating_message.message_id,
         )
         return
-    await user.update_prompt("assistant", generating_message.text)
     user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS)
     await user.update_in_db()
-    
     await console_log(f"ASSIST", "LLC_request", generating_message.text)
     await f_debug(message.chat.id, generating_message.message_id)
+
 
 
 async def reminder():
@@ -211,6 +241,7 @@ async def reminder():
         prompt_for_request = user.prompt.copy()
         prompt_for_request.append({"role": "system", "content": REMINDER_PROMPT})
         llc_msg = await send_request_to_openrouter(prompt_for_request)
+        
         try:
             sent_msg = await bot.send_message(
                 chat_id=id, text=llc_msg, parse_mode=ParseMode.MARKDOWN_V2
