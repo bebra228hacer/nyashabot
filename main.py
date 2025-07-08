@@ -183,26 +183,27 @@ async def LLC_request(message: types.Message):
     llc_msg = await send_request_to_openrouter(prompt_for_request)
     await user.update_prompt("assistant", llc_msg)
     await console_log(f"send_request_to_openrouter_raw_output", llc_msg, state=False)
-    llc_msg = llc_msg.replace("**", "*")
-    llc_msg = llc_msg.replace("***", "*")
-    llc_msg = llc_msg.replace("****", "*")
-    llc_msg = llc_msg.replace("#", "")
+    parsed_llc_msg = llc_msg
+    parsed_llc_msg = parsed_llc_msg.replace("**", "*")
+    parsed_llc_msg = parsed_llc_msg.replace("***", "*")
+    parsed_llc_msg = parsed_llc_msg.replace("****", "*")
+    parsed_llc_msg = parsed_llc_msg.replace("#", "")
     pattern = "[" + re.escape(r"\[]()>\#+\-={}.!") + "]"
-    llc_msg = re.sub(pattern, r"\\\g<0>", llc_msg)
-    await console_log(f"send_request_to_openrouter_output", llc_msg, state=False)
+    parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
+    await console_log(f"send_request_to_openrouter_output", parsed_llc_msg, state=False)
     try:
         generating_message = await bot.edit_message_text(
-            llc_msg,
+            parsed_llc_msg,
             chat_id=message.chat.id,
             message_id=generating_message.message_id,
             parse_mode=ParseMode.MARKDOWN_V2,
         )
     except TelegramBadRequest as e:
         pattern = "[" + re.escape(r"_*~`|") + "]"
-        llc_msg = re.sub(pattern, r"\\\g<0>", llc_msg)
+        parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
         try:
             generating_message = await bot.edit_message_text(
-                llc_msg,
+                parsed_llc_msg,
                 chat_id=message.chat.id,
                 message_id=generating_message.message_id,
                 parse_mode=ParseMode.MARKDOWN_V2,
@@ -244,43 +245,40 @@ async def reminder():
         await console_log(
             f"send_request_to_openrouter_raw_output", llc_msg, state=False
         )
-        llc_msg = llc_msg.replace("**", "*")
-        llc_msg = llc_msg.replace("***", "*")
-        llc_msg = llc_msg.replace("****", "*")
-        llc_msg = llc_msg.replace("#", "")
+        parsed_llc_msg = llc_msg
+        parsed_llc_msg = parsed_llc_msg.replace("**", "*")
+        parsed_llc_msg = parsed_llc_msg.replace("***", "*")
+        parsed_llc_msg = parsed_llc_msg.replace("****", "*")
+        parsed_llc_msg = parsed_llc_msg.replace("#", "")
         pattern = "[" + re.escape(r"\[]()>\#+\-={}.!") + "]"
-        llc_msg = re.sub(pattern, r"\\\g<0>", llc_msg)
-        await console_log(f"send_request_to_openrouter_output", llc_msg, state=False)
+        parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
+        await console_log(f"send_request_to_openrouter_output", parsed_llc_msg, state=False)
         try:
             generating_message = await bot.send_message(
-                llc_msg,
                 chat_id=id,
-                message_id=generating_message.message_id,
+                text = parsed_llc_msg,
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
         except TelegramBadRequest as e:
             pattern = "[" + re.escape(r"_*~`|") + "]"
-            llc_msg = re.sub(pattern, r"\\\g<0>", llc_msg)
+            parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
             try:
                 generating_message = await bot.send_message(
-                    llc_msg,
-                    chat_id=id,
-                    message_id=generating_message.message_id,
-                    parse_mode=ParseMode.MARKDOWN_V2,
-                )
+                chat_id=id,
+                text = parsed_llc_msg,
+                parse_mode=ParseMode.MARKDOWN_V2,
+            )
             except TelegramBadRequest as e:
                 generating_message = await bot.send_message(
-                    llc_msg,
-                    chat_id=id,
-                    message_id=generating_message.message_id,
-                    parse_mode=ParseMode.MARKDOWN_V2,
-                )
+                chat_id=id,
+                text = parsed_llc_msg,
+                parse_mode=ParseMode.MARKDOWN_V2,
+            )
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             generating_message = await bot.send_message(
-                "Произошла ошибка при генерации текста.",
-                chat_id=id,
-                message_id=generating_message.message_id,
+                text = "Произошла ошибка при генерации текста.",
+                chat_id=id
             )
             return
         user.remind_of_yourself = "2077-06-15 22:03:51"
