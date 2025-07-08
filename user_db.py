@@ -177,7 +177,6 @@ async def get_past_dates():
 
         async with db.execute(query) as cursor:
             results = await cursor.fetchall()
-
         for row in results:
             user_id = row[0]  
             date_str = row[1]
@@ -191,7 +190,7 @@ async def get_past_dates():
 
 
 async def main():
-    print(await get_past_dates())
+    print(await time_after(2))
     
 
 

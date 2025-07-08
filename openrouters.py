@@ -2,7 +2,6 @@ import aiohttp
 import json
 import asyncio
 import os
-import requests
 from dotenv import load_dotenv
 
 

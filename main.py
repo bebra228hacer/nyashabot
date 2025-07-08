@@ -19,8 +19,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import ReplyKeyboardRemove
 
-with open("messages.json", encoding="utf-8") as ofile:
-    MESSAGES = json.load(ofile)
 load_dotenv()
 TG_TOKEN = os.environ.get("TG_TOKEN")
 LLM_TOKEN = os.environ.get("LLM_TOKEN")
@@ -28,12 +26,13 @@ DEBUG = bool(int(os.environ.get("DEBUG")))
 DEBUG_CHAT = int(os.environ.get("DEBUG_CHAT"))
 DATABASE_NAME = os.environ.get("DATABASE_NAME")
 TABLE_NAME = os.environ.get("TABLE_NAME")
-DELAYED_REMINDERS = os.environ.get("DELAYED_REMINDERS")
+DELAYED_REMINDERS = int(os.environ.get("DELAYED_REMINDERS"))
 with open("prompts.json", encoding="utf-8") as ofile:
     PROMPTS = json.load(ofile)
     DEFAULT_PROMPT = PROMPTS["DEFAULT_PROMPT"]
     REMINDER_PROMPT = PROMPTS["REMINDER_PROMPT"]
-
+with open("messages.json", encoding="utf-8") as ofile:
+    MESSAGES = json.load(ofile)
 
 bot = Bot(token=TG_TOKEN)
 dp = Dispatcher()
@@ -43,7 +42,6 @@ class UserNotInDB(Filter):
     async def __call__(self, message: types.Message) -> bool:
         user_id = message.chat.id
         return not await user_db.user_exists(user_id)
-
 
 class UserHaveSubLevel(Filter):
     def __init__(self, required_sub_lvl: int):
@@ -57,7 +55,6 @@ class UserHaveSubLevel(Filter):
             return user.sub_lvl >= self.required_sub_lvl
         else:
             return False
-
 
 class UserIsAdmin(Filter):
     async def __call__(self, message: types.Message) -> bool:
@@ -76,6 +73,10 @@ class OldMessage(Filter):
         return time_difference >= datetime.timedelta(minutes=1)
 
 
+
+
+
+
 async def console_log(owner, text, entered_text="", cut_back = True, state = True):
     text = text.replace('\n', ' ')
     text = text.replace('\r', ' ')
@@ -84,13 +85,11 @@ async def console_log(owner, text, entered_text="", cut_back = True, state = Tru
     entered_text = entered_text.replace('\r', ' ')
     entered_text = re.sub(r'\s+', ' ', entered_text).strip()
     debug_string = f'[{datetime.datetime.now().strftime("%H.%M.%S")}|{owner}] >> {text}'
-    if entered_text and cut_back:
+    if entered_text and cut_back and len(entered_text)>=50:
         entered_text = entered_text[:50]
         debug_string = f'{debug_string}:"{entered_text}..."'
-    elif entered_text:
+    elif entered_text and cut_back:
         debug_string = f'{debug_string}:"{entered_text}..."'
-    else:
-        pass
     print(debug_string)
 
 async def f_debug(message_chat_id, message_id):
@@ -100,21 +99,20 @@ async def f_debug(message_chat_id, message_id):
         )
 
 
+
+
+
+
+
 @dp.message(F.chat.id == DEBUG_CHAT)
 async def test(message):
     # sent_msg = await message.answer("ГОВОРЯЩАЯ АДМИНИСТРАЦИЯ")
     pass
 
-
-
-
-@dp.message(OldMessage())
+@dp.message(OldMessage())   #чтобы не отвечал на сообщения которым больше минуты с момента обработки
 async def spam(message):
     #print("пуньк")
     pass
-
-
-
 
 @dp.message(UserNotInDB())
 async def registration(message):
@@ -132,7 +130,6 @@ async def registration(message):
     )
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
-
 
 @dp.message(Command("start"))
 async def cmd_answer(message: types.Message):
@@ -163,15 +160,7 @@ async def cmd_answer(message: types.Message):
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
 
-
-@dp.message(F.text.lower() == "анкета" and UserHaveSubLevel(1))
-async def main_profile_handler(message: types.Message):
-    await bot.send_message(
-        message.chat.id, "Не нужно", parse_mode=ParseMode.MARKDOWN_V2
-    )
-
-
-@dp.message()
+@dp.message(F.text)
 async def LLC_request(message: types.Message):
     
     await console_log(f"USER{message.chat.id}", "LLC_request", message.text)
@@ -232,6 +221,15 @@ async def LLC_request(message: types.Message):
     await console_log(f"ASSIST", "LLC_request", generating_message.text)
     await f_debug(message.chat.id, generating_message.message_id)
 
+@dp.message()
+async def unknown_message(message: types.Message):
+    await message.answer(MESSAGES["unknown_message"])
+
+
+
+
+
+
 
 
 async def reminder():
@@ -263,7 +261,6 @@ async def reminder():
         
         await console_log(f"ASSIST", "reminder", llc_msg)
         await f_debug(id, sent_msg.message_id)
-
 
 async def main():
     print(await user_db.check_db())
