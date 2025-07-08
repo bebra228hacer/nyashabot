@@ -43,6 +43,7 @@ class UserNotInDB(Filter):
         user_id = message.chat.id
         return not await user_db.user_exists(user_id)
 
+
 class UserHaveSubLevel(Filter):
     def __init__(self, required_sub_lvl: int):
         self.required_sub_lvl = required_sub_lvl
@@ -56,6 +57,7 @@ class UserHaveSubLevel(Filter):
         else:
             return False
 
+
 class UserIsAdmin(Filter):
     async def __call__(self, message: types.Message) -> bool:
         user = User(message.chat.id)
@@ -65,32 +67,32 @@ class UserIsAdmin(Filter):
         else:
             return False
 
+
 class OldMessage(Filter):
     async def __call__(self, message: types.Message) -> bool:
-        now = datetime.datetime.now(tz=datetime.timezone.utc)  
-        message_time = message.date.replace(tzinfo=datetime.timezone.utc) 
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        message_time = message.date.replace(tzinfo=datetime.timezone.utc)
         time_difference = now - message_time
         return time_difference >= datetime.timedelta(minutes=1)
 
 
-
-
-
-
-async def console_log(owner, text, entered_text="", cut_back = True, state = True):
-    text = text.replace('\n', ' ')
-    text = text.replace('\r', ' ')
-    text = re.sub(r'\s+', ' ', text).strip()
-    entered_text = entered_text.replace('\n', ' ')
-    entered_text = entered_text.replace('\r', ' ')
-    entered_text = re.sub(r'\s+', ' ', entered_text).strip()
+async def console_log(owner, text, entered_text="", cut_back=True, state=True):
+    if not state:
+        return 
+    text = text.replace("\n", " ")
+    text = text.replace("\r", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    entered_text = entered_text.replace("\n", " ")
+    entered_text = entered_text.replace("\r", " ")
+    entered_text = re.sub(r"\s+", " ", entered_text).strip()
     debug_string = f'[{datetime.datetime.now().strftime("%H.%M.%S")}|{owner}] >> {text}'
-    if entered_text and cut_back and len(entered_text)>=50:
+    if entered_text and cut_back and len(entered_text) >= 50:
         entered_text = entered_text[:50]
         debug_string = f'{debug_string}:"{entered_text}..."'
     elif entered_text and cut_back:
-        debug_string = f'{debug_string}:"{entered_text}..."'
+        debug_string = f'{debug_string}:"{entered_text}"'
     print(debug_string)
+
 
 async def f_debug(message_chat_id, message_id):
     if DEBUG:
@@ -99,37 +101,37 @@ async def f_debug(message_chat_id, message_id):
         )
 
 
-
-
-
-
-
 @dp.message(F.chat.id == DEBUG_CHAT)
 async def test(message):
     # sent_msg = await message.answer("ГОВОРЯЩАЯ АДМИНИСТРАЦИЯ")
     pass
 
-@dp.message(OldMessage())   #чтобы не отвечал на сообщения которым больше минуты с момента обработки
+
+@dp.message(
+    OldMessage()
+)  # чтобы не отвечал на сообщения которым больше минуты с момента обработки
 async def spam(message):
-    #print("пуньк")
+    # print("пуньк")
     pass
+
 
 @dp.message(UserNotInDB())
 async def registration(message):
     user = message.from_user
-    if user and user.username!=None:
+    if user and user.username != None:
         username = user.username
     else:
         username = "Not_of_registration"
     user = User(int(message.chat.id), username)
     await user.save_for_db()
     builder = ReplyKeyboardBuilder()
-    #builder.button(text=MESSAGES["btn_main_menu_sub"])
+    # builder.button(text=MESSAGES["btn_main_menu_sub"])
     sent_msg = await message.answer(
         MESSAGES["msg_start"], reply_markup=builder.as_markup()
     )
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
+
 
 @dp.message(Command("start"))
 async def cmd_answer(message: types.Message):
@@ -139,6 +141,7 @@ async def cmd_answer(message: types.Message):
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
 
+
 @dp.message(Command("help"))
 async def cmd_answer(message: types.Message):
     sent_msg = await message.answer(
@@ -146,6 +149,7 @@ async def cmd_answer(message: types.Message):
     )
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
+
 
 @dp.message(Command("forget"))
 async def cmd_answer(message: types.Message):
@@ -160,12 +164,13 @@ async def cmd_answer(message: types.Message):
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
 
+
 @dp.message(F.text)
 async def LLC_request(message: types.Message):
-    
-    await console_log(f"USER{message.chat.id}", "LLC_request", message.text)
+
+    await console_log(f"USER{message.chat.id}", "UserInput", message.text)
     await f_debug(message.chat.id, message.message_id)
-    
+
     generating_message = await bot.send_message(
         message.chat.id, "Текст генерируется..."
     )
@@ -177,13 +182,13 @@ async def LLC_request(message: types.Message):
     prompt_for_request.append({"role": "system", "content": DEFAULT_PROMPT})
     llc_msg = await send_request_to_openrouter(prompt_for_request)
     await user.update_prompt("assistant", llc_msg)
-    await console_log(f"send_request_to_openrouter_raw_output", llc_msg, state = False)
-    llc_msg = llc_msg.replace("**","*")
-    llc_msg = llc_msg.replace("***","*")
-    llc_msg = llc_msg.replace("****","*")
-    llc_msg = llc_msg.replace("#","")
-    pattern = '[' + re.escape(r'[]()>\#+\-={}.!') + ']'
-    llc_msg = re.sub(pattern, r'\\\g<0>', llc_msg) 
+    await console_log(f"send_request_to_openrouter_raw_output", llc_msg, state=False)
+    llc_msg = llc_msg.replace("**", "*")
+    llc_msg = llc_msg.replace("***", "*")
+    llc_msg = llc_msg.replace("****", "*")
+    llc_msg = llc_msg.replace("#", "")
+    pattern = "[" + re.escape(r"\[]()>\#+\-={}.!") + "]"
+    llc_msg = re.sub(pattern, r"\\\g<0>", llc_msg)
     await console_log(f"send_request_to_openrouter_output", llc_msg, state=False)
     try:
         generating_message = await bot.edit_message_text(
@@ -193,8 +198,8 @@ async def LLC_request(message: types.Message):
             parse_mode=ParseMode.MARKDOWN_V2,
         )
     except TelegramBadRequest as e:
-        pattern = '[' + re.escape(r'_*~`|') + ']'
-        llc_msg = re.sub(pattern, r'\\\g<0>', llc_msg) 
+        pattern = "[" + re.escape(r"_*~`|") + "]"
+        llc_msg = re.sub(pattern, r"\\\g<0>", llc_msg)
         try:
             generating_message = await bot.edit_message_text(
                 llc_msg,
@@ -218,18 +223,13 @@ async def LLC_request(message: types.Message):
         return
     user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS)
     await user.update_in_db()
-    await console_log(f"ASSIST", "LLC_request", generating_message.text)
+    await console_log(f"ASSIST", "LLC_Output", generating_message.text)
     await f_debug(message.chat.id, generating_message.message_id)
+
 
 @dp.message()
 async def unknown_message(message: types.Message):
     await message.answer(MESSAGES["unknown_message"])
-
-
-
-
-
-
 
 
 async def reminder():
@@ -238,29 +238,56 @@ async def reminder():
         await user.get_from_db()
         prompt_for_request = user.prompt.copy()
         prompt_for_request.append({"role": "system", "content": REMINDER_PROMPT})
+        await bot.send_chat_action(chat_id=id, action="typing")
         llc_msg = await send_request_to_openrouter(prompt_for_request)
-        
+        await user.update_prompt("assistant", llc_msg)
+        await console_log(
+            f"send_request_to_openrouter_raw_output", llc_msg, state=False
+        )
+        llc_msg = llc_msg.replace("**", "*")
+        llc_msg = llc_msg.replace("***", "*")
+        llc_msg = llc_msg.replace("****", "*")
+        llc_msg = llc_msg.replace("#", "")
+        pattern = "[" + re.escape(r"\[]()>\#+\-={}.!") + "]"
+        llc_msg = re.sub(pattern, r"\\\g<0>", llc_msg)
+        await console_log(f"send_request_to_openrouter_output", llc_msg, state=False)
         try:
-            sent_msg = await bot.send_message(
-                chat_id=id, text=llc_msg, parse_mode=ParseMode.MARKDOWN_V2
+            generating_message = await bot.send_message(
+                llc_msg,
+                chat_id=id,
+                message_id=generating_message.message_id,
+                parse_mode=ParseMode.MARKDOWN_V2,
             )
         except TelegramBadRequest as e:
-            llc_msg = re.sub(r"(\*\*|\_\_|\~\~)", r"\\\g<1>", llc_msg)
-            llc_msg = re.sub(r"([\[\]()>\#\+\=\-\.!\`\|\{\}])", r"\\\g<1>", llc_msg)
+            pattern = "[" + re.escape(r"_*~`|") + "]"
+            llc_msg = re.sub(pattern, r"\\\g<0>", llc_msg)
             try:
-                sent_msg = await bot.send_message(
-                    chat_id=id, text=llc_msg, parse_mode=ParseMode.MARKDOWN_V2
+                generating_message = await bot.send_message(
+                    llc_msg,
+                    chat_id=id,
+                    message_id=generating_message.message_id,
+                    parse_mode=ParseMode.MARKDOWN_V2,
                 )
             except TelegramBadRequest as e:
-                sent_msg = await bot.send_message(
-                    chat_id=id, text=llc_msg, parse_mode=ParseMode.MARKDOWN_V2
+                generating_message = await bot.send_message(
+                    llc_msg,
+                    chat_id=id,
+                    message_id=generating_message.message_id,
+                    parse_mode=ParseMode.MARKDOWN_V2,
                 )
-        await user.update_prompt("assistant", sent_msg.text)
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            generating_message = await bot.send_message(
+                "Произошла ошибка при генерации текста.",
+                chat_id=id,
+                message_id=generating_message.message_id,
+            )
+            return
         user.remind_of_yourself = "2077-06-15 22:03:51"
         await user.update_in_db()
-        
-        await console_log(f"ASSIST", "reminder", llc_msg)
-        await f_debug(id, sent_msg.message_id)
+        await console_log(f"ASSIST", "LLC_request", generating_message.text)
+        await f_debug(id, generating_message.message_id)
+
 
 async def main():
     print(await user_db.check_db())
