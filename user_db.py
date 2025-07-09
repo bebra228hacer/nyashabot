@@ -160,8 +160,8 @@ async def user_exists(user_id):
 async def time_after(after_an):
     now = datetime.now()
     future_time = now + timedelta(hours=after_an)
-    if 0 <= future_time.hour < 9:
-        future_time = future_time.replace(hour=9, minute=0, second=0, microsecond=0)
+    if 21 <= now.hour or now.hour < 6: 
+        future_time = future_time.replace(hour=6, minute=0, second=0, microsecond=0)
     formatted_future_time = future_time.strftime("%Y-%m-%d %H:%M:%S")
     return formatted_future_time
     
