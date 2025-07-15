@@ -27,6 +27,9 @@ DEBUG_CHAT = int(os.environ.get("DEBUG_CHAT"))
 DATABASE_NAME = os.environ.get("DATABASE_NAME")
 TABLE_NAME = os.environ.get("TABLE_NAME")
 DELAYED_REMINDERS = int(os.environ.get("DELAYED_REMINDERS"))
+TIMEZONE_OFFSET =int(os.environ.get("TIMEZONE_OFFSET"))
+FROM_TIME = int(os.environ.get("FROM_TIME"))
+TO_TIME = int(os.environ.get("TO_TIME"))
 with open("prompts.json", encoding="utf-8") as ofile:
     PROMPTS = json.load(ofile)
     DEFAULT_PROMPT = PROMPTS["DEFAULT_PROMPT"]
@@ -158,7 +161,7 @@ async def cmd_answer(message: types.Message):
     )
     user = User(message.chat.id)
     await user.get_from_db()
-    user.remind_of_yourself = "2077-06-15 22:03:51"
+    user.remind_of_yourself = "0"
     user.prompt = []
     await user.update_in_db()
     await f_debug(message.chat.id, message.message_id)
@@ -222,7 +225,9 @@ async def LLC_request(message: types.Message):
             message_id=generating_message.message_id,
         )
         return
-    user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS)
+    
+    user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS, TIMEZONE_OFFSET, FROM_TIME, TO_TIME)
+    print(user.remind_of_yourself)
     await user.update_in_db()
     await console_log(f"ASSIST", "LLC_Output", generating_message.text)
     await f_debug(message.chat.id, generating_message.message_id)
@@ -281,7 +286,7 @@ async def reminder():
                 chat_id=id
             )
             return
-        user.remind_of_yourself = "2077-06-15 22:03:51"
+        user.remind_of_yourself = "0"
         await user.update_in_db()
         await console_log(f"ASSIST", "LLC_request", generating_message.text)
         await f_debug(id, generating_message.message_id)

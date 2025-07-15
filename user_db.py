@@ -3,7 +3,7 @@ import os
 import asyncio
 import json 
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 load_dotenv()
@@ -13,7 +13,10 @@ DEBUG_CHAT = int(os.environ.get("DEBUG_CHAT"))
 DATABASE_NAME = os.environ.get("DATABASE_NAME")
 TABLE_NAME = os.environ.get("TABLE_NAME")
 MAX_CONTEXT = int(os.environ.get("MAX_CONTEXT"))
-
+DELAYED_REMINDERS = int(os.environ.get("DELAYED_REMINDERS"))
+TIMEZONE_OFFSET =int(os.environ.get("TIMEZONE_OFFSET"))
+FROM_TIME = int(os.environ.get("FROM_TIME"))
+TO_TIME = int(os.environ.get("TO_TIME"))
 
 class User:
     def __init__(
@@ -157,14 +160,23 @@ async def user_exists(user_id):
 
     return bool(result)
 
-async def time_after(after_an):
-    now = datetime.now()
-    future_time = now + timedelta(hours=after_an)
-    if 21 <= future_time.hour or future_time.hour < 6: 
-        future_time = future_time.replace(hour=6, minute=0, second=0, microsecond=0)
+async def time_after(after_an, timezone_offset, lower_limit, upper_limit):
+    now_utc = datetime.now(timezone.utc)
+    now_localized = now_utc + timedelta(hours=timezone_offset)
+    future_time = now_localized + timedelta(hours=after_an)
+    future_hour = future_time.hour
+    if lower_limit <= upper_limit:  
+        if lower_limit <= future_hour <= upper_limit:
+            future_time = future_time.replace(hour=upper_limit, minute=0, second=0, microsecond=0)
+    else: 
+        if lower_limit <= future_hour or future_hour < upper_limit: 
+            future_time = future_time.replace(hour=upper_limit, minute=0, second=0, microsecond=0)
+    if future_time <= now_localized:
+        future_time += timedelta(days=1)
     formatted_future_time = future_time.strftime("%Y-%m-%d %H:%M:%S")
     return formatted_future_time
-    
+
+
 async def get_past_dates():
     past_user_ids = []
     async with aiosqlite.connect(DATABASE_NAME) as db:
@@ -174,12 +186,14 @@ async def get_past_dates():
         now = datetime.now()
 
         query = f"SELECT {"id"}, {"remind_of_yourself"} FROM {TABLE_NAME}"
-
+        
         async with db.execute(query) as cursor:
             results = await cursor.fetchall()
         for row in results:
             user_id = row[0]  
             date_str = row[1]
+            if date_str == "0":
+                continue
             date_from_db = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
             if date_from_db < now:
                 past_user_ids.append(user_id) 
@@ -190,8 +204,7 @@ async def get_past_dates():
 
 
 async def main():
-    print(await time_after(2))
-    
+    print(await time_after(19, TIMEZONE_OFFSET, FROM_TIME, TO_TIME))
 
 
 if __name__ == "__main__":
