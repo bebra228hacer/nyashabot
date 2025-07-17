@@ -204,7 +204,7 @@ async def get_past_dates():
 
 
 async def main():
-    print(await time_after(19, TIMEZONE_OFFSET, FROM_TIME, TO_TIME))
+    print(await time_after(DELAYED_REMINDERS, TIMEZONE_OFFSET, FROM_TIME, TO_TIME))
 
 
 if __name__ == "__main__":

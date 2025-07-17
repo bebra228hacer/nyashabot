@@ -137,7 +137,7 @@ async def registration(message):
 
 
 @dp.message(Command("start"))
-async def cmd_answer(message: types.Message):
+async def cmd_start(message: types.Message):
     sent_msg = await message.answer(
         MESSAGES["msg_start"], reply_markup=ReplyKeyboardRemove()
     )
@@ -146,7 +146,7 @@ async def cmd_answer(message: types.Message):
 
 
 @dp.message(Command("help"))
-async def cmd_answer(message: types.Message):
+async def cmd_help(message: types.Message):
     sent_msg = await message.answer(
         MESSAGES["msg_help"], reply_markup=ReplyKeyboardRemove()
     )
@@ -155,7 +155,7 @@ async def cmd_answer(message: types.Message):
 
 
 @dp.message(Command("forget"))
-async def cmd_answer(message: types.Message):
+async def cmd_forget(message: types.Message):
     sent_msg = await message.answer(
         MESSAGES["msg_forget"], reply_markup=ReplyKeyboardRemove()
     )
@@ -167,7 +167,19 @@ async def cmd_answer(message: types.Message):
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
 
-
+@dp.message(Command("reminder"))
+async def cmd_reminder(message: types.Message):
+    sent_msg = await message.answer(
+        MESSAGES["msg_reminder"], reply_markup=ReplyKeyboardRemove()
+    )
+    user = User(message.chat.id)
+    await user.get_from_db()
+    user.remind_of_yourself = "0"
+    await user.update_in_db()
+    await f_debug(message.chat.id, message.message_id)
+    await f_debug(message.chat.id, sent_msg.message_id)
+    
+    
 @dp.message(F.text)
 async def LLC_request(message: types.Message):
 
@@ -227,7 +239,6 @@ async def LLC_request(message: types.Message):
         return
     
     user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS, TIMEZONE_OFFSET, FROM_TIME, TO_TIME)
-    print(user.remind_of_yourself)
     await user.update_in_db()
     await console_log(f"ASSIST", "LLC_Output", generating_message.text)
     await f_debug(message.chat.id, generating_message.message_id)
@@ -286,7 +297,7 @@ async def reminder():
                 chat_id=id
             )
             return
-        user.remind_of_yourself = "0"
+        user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS, TIMEZONE_OFFSET, FROM_TIME, TO_TIME)
         await user.update_in_db()
         await console_log(f"ASSIST", "LLC_request", generating_message.text)
         await f_debug(id, generating_message.message_id)
