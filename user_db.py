@@ -13,7 +13,8 @@ DEBUG_CHAT = int(os.environ.get("DEBUG_CHAT"))
 DATABASE_NAME = os.environ.get("DATABASE_NAME")
 TABLE_NAME = os.environ.get("TABLE_NAME")
 MAX_CONTEXT = int(os.environ.get("MAX_CONTEXT"))
-DELAYED_REMINDERS = int(os.environ.get("DELAYED_REMINDERS"))
+DELAYED_REMINDERS_HOURS = int(os.environ.get("DELAYED_REMINDERS_HOURS"))
+DELAYED_REMINDERS_MINUTES = int(os.environ.get("DELAYED_REMINDERS_MINUTES"))
 TIMEZONE_OFFSET =int(os.environ.get("TIMEZONE_OFFSET"))
 FROM_TIME = int(os.environ.get("FROM_TIME"))
 TO_TIME = int(os.environ.get("TO_TIME"))
@@ -160,10 +161,10 @@ async def user_exists(user_id):
 
     return bool(result)
 
-async def time_after(after_an, timezone_offset, lower_limit, upper_limit):
+async def time_after(after_hours, after_minute, timezone_offset, lower_limit, upper_limit):
     now_utc = datetime.now(timezone.utc)
     now_localized = now_utc + timedelta(hours=timezone_offset)
-    future_time = now_localized + timedelta(hours=after_an)
+    future_time = now_localized + timedelta(hours=after_hours, minutes=after_minute)
     future_hour = future_time.hour
     if lower_limit <= upper_limit:  
         if lower_limit <= future_hour <= upper_limit:

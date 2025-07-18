@@ -18,6 +18,8 @@ import asyncio
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import ReplyKeyboardRemove
+import logging
+import logging.handlers
 
 load_dotenv()
 TG_TOKEN = os.environ.get("TG_TOKEN")
@@ -26,7 +28,8 @@ DEBUG = bool(int(os.environ.get("DEBUG")))
 DEBUG_CHAT = int(os.environ.get("DEBUG_CHAT"))
 DATABASE_NAME = os.environ.get("DATABASE_NAME")
 TABLE_NAME = os.environ.get("TABLE_NAME")
-DELAYED_REMINDERS = int(os.environ.get("DELAYED_REMINDERS"))
+DELAYED_REMINDERS_HOURS = int(os.environ.get("DELAYED_REMINDERS_HOURS"))
+DELAYED_REMINDERS_MINUTES = int(os.environ.get("DELAYED_REMINDERS_MINUTES"))
 TIMEZONE_OFFSET =int(os.environ.get("TIMEZONE_OFFSET"))
 FROM_TIME = int(os.environ.get("FROM_TIME"))
 TO_TIME = int(os.environ.get("TO_TIME"))
@@ -36,6 +39,41 @@ with open("prompts.json", encoding="utf-8") as ofile:
     REMINDER_PROMPT = PROMPTS["REMINDER_PROMPT"]
 with open("messages.json", encoding="utf-8") as ofile:
     MESSAGES = json.load(ofile)
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)  
+log_file = "debug.log"  
+file_handler = logging.handlers.RotatingFileHandler(
+    log_file,               
+    maxBytes=1024 * 1024,  
+    backupCount=5,         
+    encoding='utf8'         
+)
+file_handler.setLevel(logging.DEBUG) 
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+async def console_log(owner, text, entered_text="", cut_back=True, state=True):
+    if not state:
+        return 
+    text = text.replace("\n", " ")
+    text = text.replace("\r", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    entered_text = entered_text.replace("\n", " ")
+    entered_text = entered_text.replace("\r", " ")
+    entered_text = re.sub(r"\s+", " ", entered_text).strip()
+    debug_string = f'[{datetime.datetime.now().strftime("%H.%M.%S")}|{owner}] >> {text}'
+    if entered_text and cut_back and len(entered_text) >= 50:
+        entered_text = entered_text[:50]
+        debug_string = f'{debug_string}:"{entered_text}..."'
+    elif entered_text and cut_back:
+        debug_string = f'{debug_string}:"{entered_text}"'
+    print(debug_string)
+
+
+
 
 bot = Bot(token=TG_TOKEN)
 dp = Dispatcher()
@@ -79,22 +117,7 @@ class OldMessage(Filter):
         return time_difference >= datetime.timedelta(minutes=1)
 
 
-async def console_log(owner, text, entered_text="", cut_back=True, state=True):
-    if not state:
-        return 
-    text = text.replace("\n", " ")
-    text = text.replace("\r", " ")
-    text = re.sub(r"\s+", " ", text).strip()
-    entered_text = entered_text.replace("\n", " ")
-    entered_text = entered_text.replace("\r", " ")
-    entered_text = re.sub(r"\s+", " ", entered_text).strip()
-    debug_string = f'[{datetime.datetime.now().strftime("%H.%M.%S")}|{owner}] >> {text}'
-    if entered_text and cut_back and len(entered_text) >= 50:
-        entered_text = entered_text[:50]
-        debug_string = f'{debug_string}:"{entered_text}..."'
-    elif entered_text and cut_back:
-        debug_string = f'{debug_string}:"{entered_text}"'
-    print(debug_string)
+
 
 async def keep_typing(chat_id):
     """
@@ -190,6 +213,7 @@ async def cmd_reminder(message: types.Message):
     
 @dp.message(F.text)
 async def LLC_request(message: types.Message):
+    logger.debug(f"USER{message.chat.id}:{message.text}")
     await console_log(f"USER{message.chat.id}", "UserInput", message.text)
     await f_debug(message.chat.id, message.message_id)
     generating_message = await bot.send_message(
@@ -202,6 +226,8 @@ async def LLC_request(message: types.Message):
     prompt_for_request = user.prompt.copy()
     prompt_for_request.append({"role": "system", "content": DEFAULT_PROMPT})
     llc_msg = await send_request_to_openrouter(prompt_for_request)
+    if llc_msg is None:
+        bot.send_message(DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах")
     await user.update_prompt("assistant", llc_msg)
     await console_log(f"send_request_to_openrouter_raw_output", llc_msg, state=False)
     parsed_llc_msg = llc_msg
@@ -215,6 +241,7 @@ async def LLC_request(message: types.Message):
     parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
     asyncio.timeout(10)
     await console_log(f"send_request_to_openrouter_output", parsed_llc_msg, state=False)
+    logger.debug(f"ASSISIT{message.chat.id}:{parsed_llc_msg}")
     try:
         generating_message = await bot.edit_message_text(
             parsed_llc_msg,
@@ -222,6 +249,7 @@ async def LLC_request(message: types.Message):
             message_id=generating_message.message_id,
             parse_mode=ParseMode.MARKDOWN_V2,
         )
+        logger.debug(f"ASSISIT{message.chat.id} -> отправил без доп. экранирования")
     except TelegramBadRequest as e:
         pattern = "[" + re.escape(r"_*~`|") + "]"
         parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
@@ -232,12 +260,14 @@ async def LLC_request(message: types.Message):
                 message_id=generating_message.message_id,
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
+            logger.debug(f"ASSISIT{message.chat.id} -> отправил с доп. экранированием")
         except TelegramBadRequest as e:
             generating_message = await bot.edit_message_text(
                 llc_msg,
                 chat_id=message.chat.id,
                 message_id=generating_message.message_id,
             )
+            logger.debug(f"ASSISIT{message.chat.id} -> неккоректный формат MURKDOWNV2, отправлено без него")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         generating_message = await bot.edit_message_text(
@@ -246,9 +276,10 @@ async def LLC_request(message: types.Message):
             message_id=generating_message.message_id,
         )
         typing_task.cancel()
+        logger.debug(f"ASSISIT{message.chat.id} -> запрос не был отправлен")
         return
     typing_task.cancel()
-    user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS, TIMEZONE_OFFSET, FROM_TIME, TO_TIME)
+    user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS_HOURS, DELAYED_REMINDERS_MINUTES, TIMEZONE_OFFSET, FROM_TIME, TO_TIME)
     await user.update_in_db()
     await console_log(f"ASSIST", "LLC_Output", generating_message.text)
     await f_debug(message.chat.id, generating_message.message_id)
@@ -268,6 +299,8 @@ async def reminder():
         prompt_for_request.insert(0, ({"role": "system", "content": DEFAULT_PROMPT}))
         typing_task = asyncio.create_task(keep_typing(id))
         llc_msg = await send_request_to_openrouter(prompt_for_request)
+        if llc_msg is None:
+            bot.send_message(DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах")
         await user.update_prompt("assistant", llc_msg)
         await console_log(
             f"send_request_to_openrouter_raw_output", llc_msg, state=False
@@ -280,12 +313,14 @@ async def reminder():
         pattern = "[" + re.escape(r"\[]()>\#+\-={}.!") + "]"
         parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
         await console_log(f"send_request_to_openrouter_output", parsed_llc_msg, state=False)
+        logger.debug(f"ASSISIT{id}:{parsed_llc_msg}")
         try:
             generating_message = await bot.send_message(
                 chat_id=id,
                 text = parsed_llc_msg,
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
+            logger.debug(f"ASSISIT{id} -> отправил без доп. экранирования")
         except TelegramBadRequest as e:
             pattern = "[" + re.escape(r"_*~`|") + "]"
             parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
@@ -295,12 +330,14 @@ async def reminder():
                 text = parsed_llc_msg,
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
+                logger.debug(f"ASSISIT{id} -> отправил с доп. экранированием")
             except TelegramBadRequest as e:
                 generating_message = await bot.send_message(
                 chat_id=id,
                 text = parsed_llc_msg,
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
+                logger.debug(f"ASSISIT{id} -> неккоректный формат MURKDOWNV2, отправлено без него")
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             generating_message = await bot.send_message(
@@ -308,9 +345,10 @@ async def reminder():
                 chat_id=id
             )
             typing_task.cancel()
+            logger.debug(f"ASSISIT{id} -> запрос не был отправлен")
             return
         typing_task.cancel()
-        user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS, TIMEZONE_OFFSET, FROM_TIME, TO_TIME)
+        user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS_HOURS, DELAYED_REMINDERS_MINUTES, TIMEZONE_OFFSET, FROM_TIME, TO_TIME)
         await user.update_in_db()
         await console_log(f"ASSIST", "LLC_request", generating_message.text)
         await f_debug(id, generating_message.message_id)
