@@ -205,9 +205,11 @@ async def LLC_request(message: types.Message):
     await user.update_prompt("assistant", llc_msg)
     await console_log(f"send_request_to_openrouter_raw_output", llc_msg, state=False)
     parsed_llc_msg = llc_msg
-    parsed_llc_msg = parsed_llc_msg.replace("**", "*")
-    parsed_llc_msg = parsed_llc_msg.replace("***", "*")
     parsed_llc_msg = parsed_llc_msg.replace("****", "*")
+    parsed_llc_msg = parsed_llc_msg.replace("***", "*")
+    parsed_llc_msg = parsed_llc_msg.replace("**", "*")
+    
+    
     parsed_llc_msg = parsed_llc_msg.replace("#", "")
     pattern = "[" + re.escape(r"\[]()>\#+\-={}.!") + "]"
     parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
