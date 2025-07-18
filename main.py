@@ -270,9 +270,9 @@ async def reminder():
             f"send_request_to_openrouter_raw_output", llc_msg, state=False
         )
         parsed_llc_msg = llc_msg
-        parsed_llc_msg = parsed_llc_msg.replace("**", "*")
-        parsed_llc_msg = parsed_llc_msg.replace("***", "*")
         parsed_llc_msg = parsed_llc_msg.replace("****", "*")
+        parsed_llc_msg = parsed_llc_msg.replace("***", "*")
+        parsed_llc_msg = parsed_llc_msg.replace("**", "*")
         parsed_llc_msg = parsed_llc_msg.replace("#", "")
         pattern = "[" + re.escape(r"\[]()>\#+\-={}.!") + "]"
         parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
