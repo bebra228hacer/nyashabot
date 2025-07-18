@@ -96,6 +96,14 @@ async def console_log(owner, text, entered_text="", cut_back=True, state=True):
         debug_string = f'{debug_string}:"{entered_text}"'
     print(debug_string)
 
+async def keep_typing(chat_id):
+    """
+    Периодически показывает статус "печатает..." для чат-бота.
+    """
+    while True:
+        await bot.send_chat_action(chat_id=chat_id, action="typing")
+        await asyncio.sleep(3)
+
 
 async def f_debug(message_chat_id, message_id):
     if DEBUG:
@@ -182,14 +190,12 @@ async def cmd_reminder(message: types.Message):
     
 @dp.message(F.text)
 async def LLC_request(message: types.Message):
-
     await console_log(f"USER{message.chat.id}", "UserInput", message.text)
     await f_debug(message.chat.id, message.message_id)
-
     generating_message = await bot.send_message(
         message.chat.id, "Текст генерируется..."
     )
-    await bot.send_chat_action(chat_id=message.chat.id, action="typing")
+    typing_task = asyncio.create_task(keep_typing(message.chat.id))
     user = User(message.chat.id)
     await user.get_from_db()
     await user.update_prompt("user", message.text)
@@ -205,6 +211,7 @@ async def LLC_request(message: types.Message):
     parsed_llc_msg = parsed_llc_msg.replace("#", "")
     pattern = "[" + re.escape(r"\[]()>\#+\-={}.!") + "]"
     parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
+    asyncio.timeout(10)
     await console_log(f"send_request_to_openrouter_output", parsed_llc_msg, state=False)
     try:
         generating_message = await bot.edit_message_text(
@@ -236,8 +243,9 @@ async def LLC_request(message: types.Message):
             chat_id=message.chat.id,
             message_id=generating_message.message_id,
         )
+        typing_task.cancel()
         return
-    
+    typing_task.cancel()
     user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS, TIMEZONE_OFFSET, FROM_TIME, TO_TIME)
     await user.update_in_db()
     await console_log(f"ASSIST", "LLC_Output", generating_message.text)
@@ -255,7 +263,7 @@ async def reminder():
         await user.get_from_db()
         prompt_for_request = user.prompt.copy()
         prompt_for_request.append({"role": "system", "content": REMINDER_PROMPT})
-        await bot.send_chat_action(chat_id=id, action="typing")
+        typing_task = asyncio.create_task(keep_typing(id))
         llc_msg = await send_request_to_openrouter(prompt_for_request)
         await user.update_prompt("assistant", llc_msg)
         await console_log(
@@ -296,7 +304,9 @@ async def reminder():
                 text = "Произошла ошибка при генерации текста.",
                 chat_id=id
             )
+            typing_task.cancel()
             return
+        typing_task.cancel()
         user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS, TIMEZONE_OFFSET, FROM_TIME, TO_TIME)
         await user.update_in_db()
         await console_log(f"ASSIST", "LLC_request", generating_message.text)
