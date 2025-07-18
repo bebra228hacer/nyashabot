@@ -265,6 +265,7 @@ async def reminder():
         await user.get_from_db()
         prompt_for_request = user.prompt.copy()
         prompt_for_request.append({"role": "system", "content": REMINDER_PROMPT})
+        prompt_for_request.insert(0, ({"role": "system", "content": DEFAULT_PROMPT}))
         typing_task = asyncio.create_task(keep_typing(id))
         llc_msg = await send_request_to_openrouter(prompt_for_request)
         await user.update_prompt("assistant", llc_msg)
