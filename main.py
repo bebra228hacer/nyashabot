@@ -237,7 +237,7 @@ async def LLC_request(message: types.Message):
     
     
     parsed_llc_msg = parsed_llc_msg.replace("#", "")
-    pattern = "[" + re.escape(r"\[]()>\#+\-={}.!") + "]"
+    pattern = "[" + re.escape(r"[]()>\#+-={}.!") + "]"
     parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
     asyncio.timeout(10)
     await console_log(f"send_request_to_openrouter_output", parsed_llc_msg, state=False)
@@ -294,7 +294,12 @@ async def reminder():
     for id in await user_db.get_past_dates():
         user = User(id)
         await user.get_from_db()
-        prompt_for_request = user.prompt.copy()
+        if user.prompt:  
+            if len(user.prompt) >= 2:  
+                if user.prompt[-2]["role"] == "assistant":
+                    if user.prompt[-1]["role"] == "assistant":
+                        user.prompt.pop()
+        prompt_for_request = user.prompt.copy()                    
         prompt_for_request.append({"role": "system", "content": REMINDER_PROMPT})
         prompt_for_request.insert(0, ({"role": "system", "content": DEFAULT_PROMPT}))
         typing_task = asyncio.create_task(keep_typing(id))
@@ -310,7 +315,7 @@ async def reminder():
         parsed_llc_msg = parsed_llc_msg.replace("***", "*")
         parsed_llc_msg = parsed_llc_msg.replace("**", "*")
         parsed_llc_msg = parsed_llc_msg.replace("#", "")
-        pattern = "[" + re.escape(r"\[]()>\#+\-={}.!") + "]"
+        pattern = "[" + re.escape(r"[]()>\#+-={}.!") + "]"
         parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
         await console_log(f"send_request_to_openrouter_output", parsed_llc_msg, state=False)
         logger.debug(f"ASSISIT{id}:{parsed_llc_msg}")
