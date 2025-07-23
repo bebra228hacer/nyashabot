@@ -229,18 +229,17 @@ async def LLC_request(message: types.Message):
     if llc_msg is None:
         bot.send_message(DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах")
     await user.update_prompt("assistant", llc_msg)
-    await console_log(f"send_request_to_openrouter_raw_output", llc_msg, state=False)
+    await console_log(f"send_request_to_openrouter_raw_output >> ", llc_msg, state=False)
     parsed_llc_msg = llc_msg
     parsed_llc_msg = parsed_llc_msg.replace("****", "*")
     parsed_llc_msg = parsed_llc_msg.replace("***", "*")
     parsed_llc_msg = parsed_llc_msg.replace("**", "*")
-    
-    
+    parsed_llc_msg = parsed_llc_msg.replace("\\", "")
     parsed_llc_msg = parsed_llc_msg.replace("#", "")
-    pattern = "[" + re.escape(r"[]()>\#+-={}.!") + "]"
+    pattern = "[" + re.escape(r"[]()>#+-={}.!") + "]"
     parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
     asyncio.timeout(10)
-    await console_log(f"send_request_to_openrouter_output", parsed_llc_msg, state=False)
+    await console_log(f"send_request_to_openrouter_output >>", parsed_llc_msg, state=False)
     logger.debug(f"ASSISIT{message.chat.id}:{parsed_llc_msg}")
     try:
         generating_message = await bot.edit_message_text(
@@ -308,16 +307,17 @@ async def reminder():
             bot.send_message(DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах")
         await user.update_prompt("assistant", llc_msg)
         await console_log(
-            f"send_request_to_openrouter_raw_output", llc_msg, state=False
+            f"send_request_to_openrouter_raw_output >> ", llc_msg, state=False
         )
         parsed_llc_msg = llc_msg
         parsed_llc_msg = parsed_llc_msg.replace("****", "*")
         parsed_llc_msg = parsed_llc_msg.replace("***", "*")
         parsed_llc_msg = parsed_llc_msg.replace("**", "*")
         parsed_llc_msg = parsed_llc_msg.replace("#", "")
-        pattern = "[" + re.escape(r"[]()>\#+-={}.!") + "]"
+        parsed_llc_msg = parsed_llc_msg.replace("\\", "")
+        pattern = "[" + re.escape(r"[]()>#+-={}.!") + "]"
         parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
-        await console_log(f"send_request_to_openrouter_output", parsed_llc_msg, state=False)
+        await console_log(f"send_request_to_openrouter_output >> ", parsed_llc_msg, state=False)
         logger.debug(f"ASSISIT{id}:{parsed_llc_msg}")
         try:
             generating_message = await bot.send_message(
