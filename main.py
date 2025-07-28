@@ -227,7 +227,12 @@ async def LLC_request(message: types.Message):
     prompt_for_request.append({"role": "system", "content": DEFAULT_PROMPT})
     llc_msg = await send_request_to_openrouter(prompt_for_request)
     if llc_msg is None:
-        bot.send_message(DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах")
+            await bot.send_message(DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах")
+            generating_message = await bot.send_message(
+                text = "Произошла ошибка при генерации текста.",
+                chat_id=id
+            )
+            return None
     await user.update_prompt("assistant", llc_msg)
     await console_log(f"send_request_to_openrouter_raw_output >> ", llc_msg, state=False)
     parsed_llc_msg = llc_msg
@@ -306,6 +311,11 @@ async def reminder():
         llc_msg = await send_request_to_openrouter(prompt_for_request)
         if llc_msg is None:
             await bot.send_message(DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах")
+            generating_message = await bot.send_message(
+                text = "Произошла ошибка при генерации текста.",
+                chat_id=id
+            )
+            return None
         await user.update_prompt("assistant", llc_msg)
         await console_log(
             f"send_request_to_openrouter_raw_output >> ", llc_msg, state=False
