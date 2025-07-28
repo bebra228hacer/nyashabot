@@ -30,7 +30,7 @@ DATABASE_NAME = os.environ.get("DATABASE_NAME")
 TABLE_NAME = os.environ.get("TABLE_NAME")
 DELAYED_REMINDERS_HOURS = int(os.environ.get("DELAYED_REMINDERS_HOURS"))
 DELAYED_REMINDERS_MINUTES = int(os.environ.get("DELAYED_REMINDERS_MINUTES"))
-TIMEZONE_OFFSET =int(os.environ.get("TIMEZONE_OFFSET"))
+TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET"))
 FROM_TIME = int(os.environ.get("FROM_TIME"))
 TO_TIME = int(os.environ.get("TO_TIME"))
 with open("prompts.json", encoding="utf-8") as ofile:
@@ -42,22 +42,20 @@ with open("messages.json", encoding="utf-8") as ofile:
 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)  
-log_file = "debug.log"  
+logger.setLevel(logging.DEBUG)
+log_file = "debug.log"
 file_handler = logging.handlers.RotatingFileHandler(
-    log_file,               
-    maxBytes=1024 * 1024,  
-    backupCount=5,         
-    encoding='utf8'         
+    log_file, maxBytes=1024 * 1024, backupCount=5, encoding="utf8"
 )
-file_handler.setLevel(logging.DEBUG) 
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
+
 async def console_log(owner, text, entered_text="", cut_back=True, state=True):
     if not state:
-        return 
+        return
     text = text.replace("\n", " ")
     text = text.replace("\r", " ")
     text = re.sub(r"\s+", " ", text).strip()
@@ -71,8 +69,6 @@ async def console_log(owner, text, entered_text="", cut_back=True, state=True):
     elif entered_text and cut_back:
         debug_string = f'{debug_string}:"{entered_text}"'
     print(debug_string)
-
-
 
 
 bot = Bot(token=TG_TOKEN)
@@ -115,8 +111,6 @@ class OldMessage(Filter):
         message_time = message.date.replace(tzinfo=datetime.timezone.utc)
         time_difference = now - message_time
         return time_difference >= datetime.timedelta(minutes=1)
-
-
 
 
 async def keep_typing(chat_id):
@@ -198,6 +192,7 @@ async def cmd_forget(message: types.Message):
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
 
+
 @dp.message(Command("reminder"))
 async def cmd_reminder(message: types.Message):
     sent_msg = await message.answer(
@@ -209,43 +204,56 @@ async def cmd_reminder(message: types.Message):
     await user.update_in_db()
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
-    
-    
+
+
 @dp.message(F.text)
 async def LLC_request(message: types.Message):
     logger.debug(f"USER{message.chat.id}:{message.text}")
-    await console_log(f"USER{message.chat.id}", "UserInput", message.text)
+    await console_log(f"USER{message.chat.id}", "UserInput", message.text, state=True)
     await f_debug(message.chat.id, message.message_id)
     generating_message = await bot.send_message(
         message.chat.id, "Текст генерируется..."
     )
     typing_task = asyncio.create_task(keep_typing(message.chat.id))
-    user = User(message.chat.id)
-    await user.get_from_db()
-    await user.update_prompt("user", message.text)
-    prompt_for_request = user.prompt.copy()
-    prompt_for_request.append({"role": "system", "content": DEFAULT_PROMPT})
-    llc_msg = await send_request_to_openrouter(prompt_for_request)
-    if llc_msg is None:
-            await bot.send_message(DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах")
+    try:
+        user = User(message.chat.id)
+        await user.get_from_db()
+        await user.update_prompt("user", message.text)
+        prompt_for_request = user.prompt.copy()
+        prompt_for_request.append({"role": "system", "content": DEFAULT_PROMPT})
+        llc_msg = await send_request_to_openrouter(prompt_for_request)
+        logger.debug(f"ASSISIT{message.chat.id}:{llc_msg}")
+        if llc_msg is None or llc_msg == "":
+            await bot.send_message(
+                DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах"
+            )
             generating_message = await bot.send_message(
-                text = "Произошла ошибка при генерации текста.",
-                chat_id=id
+                text="Произошла ошибка при генерации текста.", chat_id=id
             )
             return None
-    await user.update_prompt("assistant", llc_msg)
-    await console_log(f"send_request_to_openrouter_raw_output >> ", llc_msg, state=False)
-    parsed_llc_msg = llc_msg
-    parsed_llc_msg = parsed_llc_msg.replace("****", "*")
-    parsed_llc_msg = parsed_llc_msg.replace("***", "*")
-    parsed_llc_msg = parsed_llc_msg.replace("**", "*")
-    parsed_llc_msg = parsed_llc_msg.replace("\\", "")
-    parsed_llc_msg = parsed_llc_msg.replace("#", "")
-    pattern = "[" + re.escape(r"[]()>#+-={}.!") + "]"
-    parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
-    asyncio.timeout(10)
-    await console_log(f"send_request_to_openrouter_output >>", parsed_llc_msg, state=False)
-    logger.debug(f"ASSISIT{message.chat.id}:{parsed_llc_msg}")
+        await user.update_prompt("assistant", llc_msg)
+        await console_log(f"send_request_to_openrouter_raw_output", llc_msg, state=True)
+        parsed_llc_msg = llc_msg
+        parsed_llc_msg = parsed_llc_msg.replace("****", "*")
+        parsed_llc_msg = parsed_llc_msg.replace("***", "*")
+        parsed_llc_msg = parsed_llc_msg.replace("**", "*")
+        parsed_llc_msg = parsed_llc_msg.replace("\\", "")
+        parsed_llc_msg = parsed_llc_msg.replace("#", "")
+        pattern = "[" + re.escape(r"[]()>#+-={}.!") + "]"
+        parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
+        await console_log(
+            f"send_request_to_openrouter_output", parsed_llc_msg, state=True
+        )
+        logger.debug(f"ASSISIT{message.chat.id}:{parsed_llc_msg}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        await bot.send_message(DEBUG_CHAT, f"Произошла ошибка:'{e}'")
+        generating_message = await bot.send_message(
+            text="Произошла ошибка при генерации текста.", chat_id=id
+        )
+        typing_task.cancel()
+        logger.debug(f"ASSISIT{id} -> запрос не был отправлен")
+        return
     try:
         generating_message = await bot.edit_message_text(
             parsed_llc_msg,
@@ -271,7 +279,9 @@ async def LLC_request(message: types.Message):
                 chat_id=message.chat.id,
                 message_id=generating_message.message_id,
             )
-            logger.debug(f"ASSISIT{message.chat.id} -> неккоректный формат MURKDOWNV2, отправлено без него")
+            logger.debug(
+                f"ASSISIT{message.chat.id} -> неккоректный формат MARKDOWNV2, отправлено без него"
+            )
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         generating_message = await bot.edit_message_text(
@@ -283,7 +293,13 @@ async def LLC_request(message: types.Message):
         logger.debug(f"ASSISIT{message.chat.id} -> запрос не был отправлен")
         return
     typing_task.cancel()
-    user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS_HOURS, DELAYED_REMINDERS_MINUTES, TIMEZONE_OFFSET, FROM_TIME, TO_TIME)
+    user.remind_of_yourself = await user_db.time_after(
+        DELAYED_REMINDERS_HOURS,
+        DELAYED_REMINDERS_MINUTES,
+        TIMEZONE_OFFSET,
+        FROM_TIME,
+        TO_TIME,
+    )
     await user.update_in_db()
     await console_log(f"ASSIST", "LLC_Output", generating_message.text)
     await f_debug(message.chat.id, generating_message.message_id)
@@ -298,42 +314,54 @@ async def reminder():
     for id in await user_db.get_past_dates():
         user = User(id)
         await user.get_from_db()
-        if user.prompt:  
-            if len(user.prompt) >= 2:  
+        if user.prompt:
+            if len(user.prompt) >= 2:
                 if user.prompt[-2]["role"] == "assistant":
                     if user.prompt[-1]["role"] == "assistant":
                         user.prompt.pop()
-        prompt_for_request = user.prompt.copy()                    
+        prompt_for_request = user.prompt.copy()
         prompt_for_request.append({"role": "system", "content": REMINDER_PROMPT})
         prompt_for_request.insert(0, ({"role": "system", "content": DEFAULT_PROMPT}))
         typing_task = asyncio.create_task(keep_typing(id))
-        print(prompt_for_request) 
-        llc_msg = await send_request_to_openrouter(prompt_for_request)
-        if llc_msg is None:
-            await bot.send_message(DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах")
-            generating_message = await bot.send_message(
-                text = "Произошла ошибка при генерации текста.",
-                chat_id=id
+        try:
+            llc_msg = await send_request_to_openrouter(prompt_for_request)
+            if llc_msg is None or llc_msg == "":
+                await bot.send_message(
+                    DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах"
+                )
+                generating_message = await bot.send_message(
+                    text="Произошла ошибка при генерации текста.", chat_id=id
+                )
+                return None
+            await user.update_prompt("assistant", llc_msg)
+            await console_log(
+                f"send_request_to_openrouter_raw_output", llc_msg, state=False
             )
-            return None
-        await user.update_prompt("assistant", llc_msg)
-        await console_log(
-            f"send_request_to_openrouter_raw_output >> ", llc_msg, state=False
-        )
-        parsed_llc_msg = llc_msg
-        parsed_llc_msg = parsed_llc_msg.replace("****", "*")
-        parsed_llc_msg = parsed_llc_msg.replace("***", "*")
-        parsed_llc_msg = parsed_llc_msg.replace("**", "*")
-        parsed_llc_msg = parsed_llc_msg.replace("#", "")
-        parsed_llc_msg = parsed_llc_msg.replace("\\", "")
-        pattern = "[" + re.escape(r"[]()>#+-={}.!") + "]"
-        parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
-        await console_log(f"send_request_to_openrouter_output >> ", parsed_llc_msg, state=False)
-        logger.debug(f"ASSISIT{id}:{parsed_llc_msg}")
+            parsed_llc_msg = llc_msg
+            parsed_llc_msg = parsed_llc_msg.replace("****", "*")
+            parsed_llc_msg = parsed_llc_msg.replace("***", "*")
+            parsed_llc_msg = parsed_llc_msg.replace("**", "*")
+            parsed_llc_msg = parsed_llc_msg.replace("#", "")
+            parsed_llc_msg = parsed_llc_msg.replace("\\", "")
+            pattern = "[" + re.escape(r"[]()>#+-={}.!") + "]"
+            parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
+            await console_log(
+                f"send_request_to_openrouter_output", parsed_llc_msg, state=True
+            )
+            logger.debug(f"ASSISIT{id}:{parsed_llc_msg}")
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            await bot.send_message(DEBUG_CHAT, f"Произошла ошибка:'{e}'")
+            generating_message = await bot.send_message(
+                text="Произошла ошибка при генерации текста.", chat_id=id
+            )
+            typing_task.cancel()
+            logger.debug(f"ASSISIT{id} -> запрос не был отправлен")
+            return
         try:
             generating_message = await bot.send_message(
                 chat_id=id,
-                text = parsed_llc_msg,
+                text=parsed_llc_msg,
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
             logger.debug(f"ASSISIT{id} -> отправил без доп. экранирования")
@@ -342,42 +370,55 @@ async def reminder():
             parsed_llc_msg = re.sub(pattern, r"\\\g<0>", parsed_llc_msg)
             try:
                 generating_message = await bot.send_message(
-                chat_id=id,
-                text = parsed_llc_msg,
-                parse_mode=ParseMode.MARKDOWN_V2,
-            )
+                    chat_id=id,
+                    text=parsed_llc_msg,
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                )
                 logger.debug(f"ASSISIT{id} -> отправил с доп. экранированием")
             except TelegramBadRequest as e:
                 generating_message = await bot.send_message(
-                chat_id=id,
-                text = parsed_llc_msg,
-                parse_mode=ParseMode.MARKDOWN_V2,
-            )
-                logger.debug(f"ASSISIT{id} -> неккоректный формат MURKDOWNV2, отправлено без него")
+                    chat_id=id,
+                    text=parsed_llc_msg,
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                )
+                logger.debug(
+                    f"ASSISIT{id} -> неккоректный формат MARKDOWNV2, отправлено без него"
+                )
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
+            await bot.send_message(DEBUG_CHAT, f"Произошла ошибка:'{e}'")
             generating_message = await bot.send_message(
-                text = "Произошла ошибка при генерации текста.",
-                chat_id=id
+                text="Произошла ошибка при генерации текста.", chat_id=id
             )
             typing_task.cancel()
             logger.debug(f"ASSISIT{id} -> запрос не был отправлен")
             return
         typing_task.cancel()
-        user.remind_of_yourself = await user_db.time_after(DELAYED_REMINDERS_HOURS, DELAYED_REMINDERS_MINUTES, TIMEZONE_OFFSET, FROM_TIME, TO_TIME)
+        user.remind_of_yourself = await user_db.time_after(
+            DELAYED_REMINDERS_HOURS,
+            DELAYED_REMINDERS_MINUTES,
+            TIMEZONE_OFFSET,
+            FROM_TIME,
+            TO_TIME,
+        )
         await user.update_in_db()
         await console_log(f"ASSIST", "LLC_request", generating_message.text)
         await f_debug(id, generating_message.message_id)
 
 
 async def main():
-    print(await user_db.check_db())
-    print("Основная часть запущена")
-    print("Отладка:\n")
-    polling_task = asyncio.create_task(dp.start_polling(bot))
-    while True:
-        await reminder()
-        await asyncio.sleep(5)
+    try:
+        print(await user_db.check_db())
+        print("Основная часть запущена")
+        print("Отладка:\n")
+        polling_task = asyncio.create_task(dp.start_polling(bot))
+        while True:
+            await reminder()
+            await asyncio.sleep(5)
+    except Exception as e:
+        print(f"Ошибка: {e}")
+        await bot.send_message(DEBUG_CHAT, f"Произошла ошибка:'{e}'")
+        logger.debug(f"CRITICAL_ERROR:{e}")
 
 
 if __name__ == "__main__":
