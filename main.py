@@ -117,7 +117,7 @@ async def keep_typing(chat_id):
     """
     Периодически показывает статус "печатает..." для чат-бота.
     """
-    while True:
+    for i in range(10):
         await bot.send_chat_action(chat_id=chat_id, action="typing")
         await asyncio.sleep(3)
 
@@ -153,7 +153,7 @@ async def registration(message):
     user = User(int(message.chat.id), username)
     await user.save_for_db()
     builder = ReplyKeyboardBuilder()
-    # builder.button(text=MESSAGES["btn_main_menu_sub"])
+
     sent_msg = await message.answer(
         MESSAGES["msg_start"], reply_markup=builder.as_markup()
     )
@@ -189,6 +189,7 @@ async def cmd_forget(message: types.Message):
     user.remind_of_yourself = "0"
     user.prompt = []
     await user.update_in_db()
+
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
 
@@ -227,8 +228,10 @@ async def LLC_request(message: types.Message):
             await bot.send_message(
                 DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах"
             )
-            generating_message = await bot.send_message(
-                text="Произошла ошибка при генерации текста.", chat_id=id
+            generating_message = await bot.edit_message_text(
+                "Произошла ошибка при генерации текста.",
+                chat_id=message.chat.id,
+                message_id=generating_message.message_id,
             )
             return None
         await user.update_prompt("assistant", llc_msg)
@@ -245,6 +248,16 @@ async def LLC_request(message: types.Message):
             f"send_request_to_openrouter_output", parsed_llc_msg, state=True
         )
         logger.debug(f"ASSISIT{message.chat.id}:{parsed_llc_msg}")
+        if parsed_llc_msg is None or parsed_llc_msg.strip() == "":
+            await bot.send_message(
+                DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах"
+            )
+            generating_message = await bot.edit_message_text(
+                "Произошла ошибка при генерации текста.",
+                chat_id=message.chat.id,
+                message_id=generating_message.message_id,
+            )
+            return None
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         await bot.send_message(DEBUG_CHAT, f"Произошла ошибка:'{e}'")
@@ -325,12 +338,10 @@ async def reminder():
         typing_task = asyncio.create_task(keep_typing(id))
         try:
             llc_msg = await send_request_to_openrouter(prompt_for_request)
+            logger.debug(f"ASSISIT{id}_RAWOUTPUT:{llc_msg}")
             if llc_msg is None or llc_msg == "":
                 await bot.send_message(
                     DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах"
-                )
-                generating_message = await bot.send_message(
-                    text="Произошла ошибка при генерации текста.", chat_id=id
                 )
                 return None
             await user.update_prompt("assistant", llc_msg)
@@ -348,7 +359,12 @@ async def reminder():
             await console_log(
                 f"send_request_to_openrouter_output", parsed_llc_msg, state=True
             )
-            logger.debug(f"ASSISIT{id}:{parsed_llc_msg}")
+            logger.debug(f"ASSISIT{id}CLEANOUTPUT:{parsed_llc_msg}")
+            if parsed_llc_msg is None or parsed_llc_msg.strip() == "":
+                await bot.send_message(
+                    DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах"
+                )
+                return None
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             await bot.send_message(DEBUG_CHAT, f"Произошла ошибка:'{e}'")
@@ -387,9 +403,6 @@ async def reminder():
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             await bot.send_message(DEBUG_CHAT, f"Произошла ошибка:'{e}'")
-            generating_message = await bot.send_message(
-                text="Произошла ошибка при генерации текста.", chat_id=id
-            )
             typing_task.cancel()
             logger.debug(f"ASSISIT{id} -> запрос не был отправлен")
             return
