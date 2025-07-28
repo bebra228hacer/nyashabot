@@ -302,9 +302,10 @@ async def reminder():
         prompt_for_request.append({"role": "system", "content": REMINDER_PROMPT})
         prompt_for_request.insert(0, ({"role": "system", "content": DEFAULT_PROMPT}))
         typing_task = asyncio.create_task(keep_typing(id))
+        print(prompt_for_request) 
         llc_msg = await send_request_to_openrouter(prompt_for_request)
         if llc_msg is None:
-            bot.send_message(DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах")
+            await bot.send_message(DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах")
         await user.update_prompt("assistant", llc_msg)
         await console_log(
             f"send_request_to_openrouter_raw_output >> ", llc_msg, state=False
