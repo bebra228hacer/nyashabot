@@ -226,7 +226,7 @@ async def LLC_request(message: types.Message):
         logger.debug(f"ASSISIT{message.chat.id}:{llc_msg}")
         if llc_msg is None or llc_msg == "":
             await bot.send_message(
-                DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах"
+                DEBUG_CHAT, f"Запрос не прошел! Вывод с модельки: {llc_msg}"
             )
             generating_message = await bot.edit_message_text(
                 "Произошла ошибка при генерации текста.",
@@ -250,7 +250,7 @@ async def LLC_request(message: types.Message):
         logger.debug(f"ASSISIT{message.chat.id}:{parsed_llc_msg}")
         if parsed_llc_msg is None or parsed_llc_msg.strip() == "":
             await bot.send_message(
-                DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах"
+                DEBUG_CHAT, f"Запрос не прошел! Вывод с модельки: {parsed_llc_msg}"
             )
             generating_message = await bot.edit_message_text(
                 "Произошла ошибка при генерации текста.",
@@ -341,7 +341,7 @@ async def reminder():
             logger.debug(f"ASSISIT{id}_RAWOUTPUT:{llc_msg}")
             if llc_msg is None or llc_msg == "":
                 await bot.send_message(
-                    DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах"
+                    DEBUG_CHAT, f"Запрос не прошел! Вывод с модельки: {llc_msg}"
                 )
                 return None
             await user.update_prompt("assistant", llc_msg)
@@ -362,7 +362,7 @@ async def reminder():
             logger.debug(f"ASSISIT{id}CLEANOUTPUT:{parsed_llc_msg}")
             if parsed_llc_msg is None or parsed_llc_msg.strip() == "":
                 await bot.send_message(
-                    DEBUG_CHAT, "Запрос не прошел! Скорее всего дело в токенах"
+                    DEBUG_CHAT, f"Запрос не прошел! Вывод с модельки: {parsed_llc_msg}"
                 )
                 return None
         except Exception as e:
