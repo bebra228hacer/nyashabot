@@ -14,6 +14,7 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest
 from openrouters import send_request_to_openrouter
 from aiogram import Bot, Dispatcher, types
+from aiogram.exceptions import TelegramForbiddenError
 import asyncio
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -400,6 +401,13 @@ async def reminder():
                 logger.debug(
                     f"ASSISIT{id} -> неккоректный формат MARKDOWNV2, отправлено без него"
                 )
+        except TelegramForbiddenError:
+            typing_task.cancel()
+            user.remind_of_yourself = 0
+            await user.update_in_db()
+            await bot.send_message(DEBUG_CHAT, f"USER{id} заблокировал чатбота")
+            typing_task.cancel()
+            return
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             await bot.send_message(DEBUG_CHAT, f"Произошла ошибка:'{e}'")
