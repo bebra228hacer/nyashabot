@@ -220,7 +220,7 @@ async def LLC_request(message: types.Message):
         await bot.send_message(
             DEBUG_CHAT, f"LLC{message.chat.id} - пустой ответ от llc"
         )
-        llc_msg = await send_request_to_openrouter(prompt_for_request)
+        return
     await user.update_prompt("assistant", llc_msg)
 
     logger.debug(f"LLC_RAWOUTPUT{message.chat.id}:{llc_msg}")
@@ -288,7 +288,7 @@ async def reminder():
             await bot.send_message(DEBUG_CHAT, f"LLC{id} - Критическая ошибка: {e}")
         if llc_msg is None or llc_msg.strip() == "":
             await bot.send_message(DEBUG_CHAT, f"LLC{id} - пустой ответ от llc")
-            llc_msg = await send_request_to_openrouter(prompt_for_request)
+            return
         await user.update_prompt("assistant", llc_msg)
 
         logger.debug(f"LLC_RAWOUTPUT{id}:{llc_msg}")
