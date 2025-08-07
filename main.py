@@ -17,7 +17,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 
-from openrouters import send_request_to_openrouter # Импорт конкретной функции
+from openrouters import send_request_to_openrouter
 
 import telegramify_markdown 
 from telegramify_markdown import customize
@@ -38,6 +38,12 @@ DELAYED_REMINDERS_MINUTES = int(os.environ.get("DELAYED_REMINDERS_MINUTES"))
 TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET"))
 FROM_TIME = int(os.environ.get("FROM_TIME"))
 TO_TIME = int(os.environ.get("TO_TIME"))
+ADMIN_LIST_STR = os.environ.get("ADMIN_LIST")
+if ADMIN_LIST_STR:
+    ADMIN_LIST = list(map(int, ADMIN_LIST_STR.split(",")))
+else:
+    ADMIN_LIST = set()
+
 with open("prompts.json", encoding="utf-8") as ofile:
     PROMPTS = json.load(ofile)
     DEFAULT_PROMPT = PROMPTS["DEFAULT_PROMPT"]
@@ -68,6 +74,10 @@ bot = Bot(token=TG_TOKEN)
 dp = Dispatcher()
 
 
+class ADMINKA_despatch(StatesGroup):
+    adminka_input_id = State()
+    adminka_input_text = State()
+
 class UserNotInDB(Filter):
     async def __call__(self, message: types.Message) -> bool:
         user_id = message.chat.id
@@ -90,12 +100,11 @@ class UserHaveSubLevel(Filter):
 
 class UserIsAdmin(Filter):
     async def __call__(self, message: types.Message) -> bool:
-        user = User(message.chat.id)
-        await user.get_from_db()
-        if user:
-            return int(user.is_admin) >= 1
+        if message.chat.id in ADMIN_LIST:
+            return True
         else:
-            return False
+            False
+        
 
 
 class OldMessage(Filter):
@@ -184,6 +193,35 @@ async def cmd_forget(message: types.Message):
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
 
+@dp.message(ADMINKA_despatch.adminka_input_text)
+async def process_input(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    id = data.get("id")
+    try:
+        await bot.send_message(int(id), text = message.text)
+    except Exception as e:
+        await bot.send_message(
+            DEBUG_CHAT, f"LLM{message.chat.id} - ошибка при отправке {e}. Вы в главном меню"
+        )
+        await message.answer(f"LLM{message.chat.id} - ошибка при отправке {e}. Вы в главном меню")
+        await state.clear() 
+        return
+    await message.answer(MESSAGES["adminka_dispatch3"])
+    await state.clear() 
+
+@dp.message(ADMINKA_despatch.adminka_input_id)
+async def process_input(message: types.Message, state: FSMContext):
+    user_input = message.text
+    await state.update_data(id=user_input)
+    await message.answer(MESSAGES["adminka_dispatch2"])
+    await state.set_state(ADMINKA_despatch.adminka_input_text)
+
+@dp.message(UserIsAdmin(), Command("dispatch"))
+async def cmd_forget(message: types.Message, state: FSMContext):
+    sent_msg = await message.answer(
+        MESSAGES["adminka_dispatch1"], reply_markup=ReplyKeyboardRemove()
+    )
+    await state.set_state(ADMINKA_despatch.adminka_input_id)
 
 @dp.message(Command("reminder"))
 async def cmd_reminder(message: types.Message):
@@ -197,11 +235,10 @@ async def cmd_reminder(message: types.Message):
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
 
-
 @dp.message(F.text)
-async def LLC_request(message: types.Message):
+async def LLM_request(message: types.Message):
 
-    logger.info(f"USER{message.chat.id}TOLLC:{message.text}")
+    logger.info(f"USER{message.chat.id}TOLLM:{message.text}")
     await f_debug(message.chat.id, message.message_id)
 
     typing_task = asyncio.create_task(keep_typing(message.chat.id))
@@ -211,22 +248,22 @@ async def LLC_request(message: types.Message):
     prompt_for_request = user.prompt.copy()
     prompt_for_request.append({"role": "system", "content": DEFAULT_PROMPT})
     try:
-        llc_msg = await send_request_to_openrouter(prompt_for_request)
+        llm_msg = await send_request_to_openrouter(prompt_for_request)
     except Exception as e:
         await bot.send_message(
-            DEBUG_CHAT, f"LLC{message.chat.id} - Критическая ошибка: {e}"
+            DEBUG_CHAT, f"LLM{message.chat.id} - Критическая ошибка: {e}"
         )
-    if llc_msg is None or llc_msg.strip() == "":
+    if llm_msg is None or llm_msg.strip() == "":
         await bot.send_message(
-            DEBUG_CHAT, f"LLC{message.chat.id} - пустой ответ от llc"
+            DEBUG_CHAT, f"LLM{message.chat.id} - пустой ответ от LLM"
         )
         return
-    await user.update_prompt("assistant", llc_msg)
+    await user.update_prompt("assistant", llm_msg)
 
-    logger.debug(f"LLC_RAWOUTPUT{message.chat.id}:{llc_msg}")
+    logger.debug(f"LLM_RAWOUTPUT{message.chat.id}:{llm_msg}")
 
     converted = telegramify_markdown.markdownify(
-        llc_msg,
+        llm_msg,
         max_line_length=None,
         normalize_whitespace=False,
     )
@@ -245,9 +282,9 @@ async def LLC_request(message: types.Message):
             return
     except Exception as e:
         generated_message = await bot.send_message(
-            DEBUG_CHAT, f"LLC{message.chat.id} - {e}"
+            DEBUG_CHAT, f"LLM{message.chat.id} - {e}"
         )
-        logger.error(f"LLC{message.chat.id} - {e}")
+        logger.error(f"LLM{message.chat.id} - {e}")
         generated_message = await message.answer(
             converted,
         )
@@ -261,13 +298,11 @@ async def LLC_request(message: types.Message):
     )
     await user.update_in_db()
     await f_debug(message.chat.id, generated_message.message_id)
-    logger.info(f"LLC{message.chat.id} - {generated_message.text}")
-
+    logger.info(f"LLM{message.chat.id} - {generated_message.text}")
 
 @dp.message()
 async def unknown_message(message: types.Message):
     await message.answer(MESSAGES["unknown_message"])
-
 
 async def reminder():
     for id in await user_db.get_past_dates():
@@ -283,18 +318,18 @@ async def reminder():
         prompt_for_request.insert(0, ({"role": "system", "content": DEFAULT_PROMPT}))
         typing_task = asyncio.create_task(keep_typing(id))
         try:
-            llc_msg = await send_request_to_openrouter(prompt_for_request)
+            llm_msg = await send_request_to_openrouter(prompt_for_request)
         except Exception as e:
-            await bot.send_message(DEBUG_CHAT, f"LLC{id} - Критическая ошибка: {e}")
-        if llc_msg is None or llc_msg.strip() == "":
-            await bot.send_message(DEBUG_CHAT, f"LLC{id} - пустой ответ от llc")
+            await bot.send_message(DEBUG_CHAT, f"LLM{id} - Критическая ошибка: {e}")
+        if llm_msg is None or llm_msg.strip() == "":
+            await bot.send_message(DEBUG_CHAT, f"LLM{id} - пустой ответ от LLM")
             return
-        await user.update_prompt("assistant", llc_msg)
+        await user.update_prompt("assistant", llm_msg)
 
-        logger.debug(f"LLC_RAWOUTPUT{id}:{llc_msg}")
+        logger.debug(f"LLM_RAWOUTPUT{id}:{llm_msg}")
 
         converted = telegramify_markdown.markdownify(
-            llc_msg,
+            llm_msg,
             max_line_length=None,
             normalize_whitespace=False,
         )
@@ -313,8 +348,8 @@ async def reminder():
             typing_task.cancel()
             return
         except Exception as e:
-            await bot.send_message(DEBUG_CHAT, f"LLC{id} - {e}")
-            logger.error(f"LLC{id} - {e}")
+            await bot.send_message(DEBUG_CHAT, f"LLM{id} - {e}")
+            logger.error(f"LLM{id} - {e}")
             generated_message = await bot.send_message(
                 chat_id=id,
                 text=converted,
@@ -329,7 +364,7 @@ async def reminder():
         )
         await user.update_in_db()
         await f_debug(id, generated_message.message_id)
-        logger.info(f"LLC{id}REMINDER - {generated_message.text}")
+        logger.info(f"LLM{id}REMINDER - {generated_message.text}")
 
 
 async def main():
