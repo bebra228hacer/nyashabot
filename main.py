@@ -237,7 +237,9 @@ async def cmd_reminder(message: types.Message):
 
 @dp.message(F.text)
 async def LLM_request(message: types.Message):
-
+    await bot.send_message(
+            DEBUG_CHAT, f"USER{message.chat.id}:"
+        )
     logger.info(f"USER{message.chat.id}TOLLM:{message.text}")
     await f_debug(message.chat.id, message.message_id)
 
