@@ -145,6 +145,11 @@ async def spam(message):
 
 @dp.message(UserNotInDB())
 async def registration(message):
+    args = message.text.split()
+    
+    if len(args) > 1:
+        referral_code = args[1]
+        await bot.send_message(DEBUG_CHAT, f"Переход по реф.ссылке, код: {referral_code}")
     user = message.from_user
     if user and user.username != None:
         username = user.username
@@ -255,9 +260,16 @@ async def LLM_request(message: types.Message):
         await bot.send_message(
             DEBUG_CHAT, f"LLM{message.chat.id} - Критическая ошибка: {e}"
         )
+        generated_message = await message.answer(
+            "Прости, твое сообщение вызвало у меня ошибку(( Пожалуйста попробуй снова",
+        )
+        return
     if llm_msg is None or llm_msg.strip() == "":
         await bot.send_message(
             DEBUG_CHAT, f"LLM{message.chat.id} - пустой ответ от LLM"
+        )
+        generated_message = await message.answer(
+            "Прости, твое сообщение вызвало у меня ошибку(( Пожалуйста попробуй снова",
         )
         return
     await user.update_prompt("assistant", llm_msg)
