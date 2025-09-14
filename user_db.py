@@ -80,6 +80,15 @@ class User:
             else:
                 return None
 
+
+    async def get_ids_from_table():
+        async with aiosqlite.connect(DATABASE_NAME) as db:
+            async with db.execute(f"SELECT id FROM {TABLE_NAME}") as cursor:
+                rows = await cursor.fetchall()
+                ids = [row[0] for row in rows]
+        return ids
+
+
     async def save_for_db(self):
         async with aiosqlite.connect(DATABASE_NAME) as db:
             cursor = await db.cursor()
@@ -205,7 +214,7 @@ async def get_past_dates():
 
 
 async def main():
-    pass
+    print(await User.get_ids_from_table())
 
 
 if __name__ == "__main__":

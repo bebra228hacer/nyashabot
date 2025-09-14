@@ -77,6 +77,9 @@ dp = Dispatcher()
 class ADMINKA_despatch(StatesGroup):
     adminka_input_id = State()
     adminka_input_text = State()
+    
+class ADMINKA_despatch_all(StatesGroup):
+    adminka_input_text = State()
 
 class UserNotInDB(Filter):
     async def __call__(self, message: types.Message) -> bool:
@@ -199,7 +202,7 @@ async def cmd_forget(message: types.Message):
     await f_debug(message.chat.id, sent_msg.message_id)
 
 @dp.message(ADMINKA_despatch.adminka_input_text)
-async def process_input(message: types.Message, state: FSMContext):
+async def cmd_dispatch_input_text(message: types.Message, state: FSMContext):
     data = await state.get_data()
     id = data.get("id")
     try:
@@ -215,18 +218,47 @@ async def process_input(message: types.Message, state: FSMContext):
     await state.clear() 
 
 @dp.message(ADMINKA_despatch.adminka_input_id)
-async def process_input(message: types.Message, state: FSMContext):
+async def cmd_dispatch_input_id(message: types.Message, state: FSMContext):
     user_input = message.text
     await state.update_data(id=user_input)
     await message.answer(MESSAGES["adminka_dispatch2"])
     await state.set_state(ADMINKA_despatch.adminka_input_text)
 
 @dp.message(UserIsAdmin(), Command("dispatch"))
-async def cmd_forget(message: types.Message, state: FSMContext):
+async def cmd_dispatch(message: types.Message, state: FSMContext):
     sent_msg = await message.answer(
         MESSAGES["adminka_dispatch1"], reply_markup=ReplyKeyboardRemove()
     )
     await state.set_state(ADMINKA_despatch.adminka_input_id)
+
+@dp.message(ADMINKA_despatch_all.adminka_input_text)
+async def cmd_dispatch_all_input_text(message: types.Message, state: FSMContext):
+    try:
+        all_ids = await User.get_ids_from_table()
+        for id in all_ids:
+            await bot.send_message(
+            id, message.text
+        )
+        await bot.send_message(
+            DEBUG_CHAT, f"Сообщение отправлено {len(all_ids)} пользователям"
+        )
+    except Exception as e:
+        await bot.send_message(
+            DEBUG_CHAT, f"USER{message.chat.id} - ошибка при отправке {e}. Вы в главном меню"
+        )
+        await message.answer(f"USER{message.chat.id} - ошибка при отправке {e}. Вы в главном меню")
+        await state.clear() 
+        return
+    await message.answer(MESSAGES["adminka_dispatch3"])
+    await state.clear() 
+
+@dp.message(UserIsAdmin(), Command("dispatch_all"))
+async def cmd_dispatch_all(message: types.Message, state: FSMContext):
+    sent_msg = await message.answer(
+        MESSAGES["adminka_dispatch_all"], reply_markup=ReplyKeyboardRemove()
+    )
+    await state.set_state(ADMINKA_despatch_all.adminka_input_text)
+
 
 @dp.message(Command("reminder"))
 async def cmd_reminder(message: types.Message):
