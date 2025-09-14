@@ -235,12 +235,18 @@ async def cmd_dispatch(message: types.Message, state: FSMContext):
 async def cmd_dispatch_all_input_text(message: types.Message, state: FSMContext):
     try:
         all_ids = await User.get_ids_from_table()
+        success_dispatch = 0
         for id in all_ids:
-            await bot.send_message(
-            id, message.text
+            try:
+                await bot.send_message(id, message.text)
+                success_dispatch = success_dispatch + 1
+            except:
+                continue
+        await bot.send_message(
+            DEBUG_CHAT, f"Сообщение отправлено {success_dispatch} пользователям"
         )
         await bot.send_message(
-            DEBUG_CHAT, f"Сообщение отправлено {len(all_ids)} пользователям"
+            message.chat.id, f"Сообщение отправлено {success_dispatch} пользователям"
         )
     except Exception as e:
         await bot.send_message(
