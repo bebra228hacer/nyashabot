@@ -1,5 +1,5 @@
 import asyncio
-import datetime
+from datetime import datetime, timezone, timedelta
 import json
 import logging
 import logging.handlers
@@ -112,10 +112,10 @@ class UserIsAdmin(Filter):
 
 class OldMessage(Filter):
     async def __call__(self, message: types.Message) -> bool:
-        now = datetime.datetime.now(tz=datetime.timezone.utc)
-        message_time = message.date.replace(tzinfo=datetime.timezone.utc)
+        now = datetime.now(tz=timezone.utc)
+        message_time = message.date.replace(tzinfo=timezone.utc)
         time_difference = now - message_time
-        return time_difference >= datetime.timedelta(minutes=1)
+        return time_difference >= timedelta(minutes=1)
 
 
 async def keep_typing(chat_id):
@@ -291,7 +291,8 @@ async def LLM_request(message: types.Message):
     await user.get_from_db()
     await user.update_prompt("user", message.text)
     prompt_for_request = user.prompt.copy()
-    prompt_for_request.append({"role": "system", "content": DEFAULT_PROMPT})
+    prompt_for_request.append({"role": "system", "content": DEFAULT_PROMPT.replace("{CURRENTDATE}", datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S"))})
+
     try:
         llm_msg = await send_request_to_openrouter(prompt_for_request)
     except Exception as e:
@@ -366,7 +367,7 @@ async def reminder():
                     if user.prompt[-1]["role"] == "assistant":
                         user.prompt.pop()
         prompt_for_request = user.prompt.copy()
-        prompt_for_request.append({"role": "system", "content": REMINDER_PROMPT})
+        prompt_for_request.append({"role": "system", "content": REMINDER_PROMPT.replace("{CURRENTDATE}", datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S"))})
         prompt_for_request.insert(0, ({"role": "system", "content": DEFAULT_PROMPT}))
         typing_task = asyncio.create_task(keep_typing(id))
         try:
