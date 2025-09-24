@@ -278,11 +278,10 @@ async def cmd_reminder(message: types.Message):
     await f_debug(message.chat.id, message.message_id)
     await f_debug(message.chat.id, sent_msg.message_id)
 
+
 @dp.message(F.text)
 async def LLM_request(message: types.Message):
-    await bot.send_message(
-            DEBUG_CHAT, f"USER{message.chat.id}:"
-        )
+    await bot.send_message(DEBUG_CHAT, f"USER{message.chat.id}:")
     logger.info(f"USER{message.chat.id}TOLLM:{message.text}")
     await f_debug(message.chat.id, message.message_id)
 
@@ -296,23 +295,16 @@ async def LLM_request(message: types.Message):
     try:
         llm_msg = await send_request_to_openrouter(prompt_for_request)
     except Exception as e:
-        await bot.send_message(
-            DEBUG_CHAT, f"LLM{message.chat.id} - Критическая ошибка: {e}"
-        )
-        generated_message = await message.answer(
-            "Прости, твое сообщение вызвало у меня ошибку(( Пожалуйста попробуй снова",
-        )
+        await bot.send_message(DEBUG_CHAT, f"LLM{message.chat.id} - Критическая ошибка: {e}")
+        await message.answer("Прости, твое сообщение вызвало у меня ошибку(( Пожалуйста попробуй снова")
         return
-    if llm_msg is None or llm_msg.strip() == "":
-        await bot.send_message(
-            DEBUG_CHAT, f"LLM{message.chat.id} - пустой ответ от LLM"
-        )
-        generated_message = await message.answer(
-            "Прости, твое сообщение вызвало у меня ошибку(( Пожалуйста попробуй снова",
-        )
-        return
-    await user.update_prompt("assistant", llm_msg)
 
+    if llm_msg is None or llm_msg.strip() == "":
+        await bot.send_message(DEBUG_CHAT, f"LLM{message.chat.id} - пустой ответ от LLM")
+        await message.answer("Прости, твое сообщение вызвало у меня ошибку(( Пожалуйста попробуй снова")
+        return
+
+    await user.update_prompt("assistant", llm_msg)
     logger.debug(f"LLM_RAWOUTPUT{message.chat.id}:{llm_msg}")
 
     converted = telegramify_markdown.markdownify(
@@ -322,25 +314,23 @@ async def LLM_request(message: types.Message):
     )
 
     try:
-        generated_message = await message.answer(
-            converted,
-            parse_mode=ParseMode.MARKDOWN_V2,
-        )
+        start = 0
+        while start < len(converted):
+            chunk = converted[start:start + 4096]
+            message = await message.answer(chunk, parse_mode=ParseMode.MARKDOWN_V2)
+            start += 4096
+            
     except TelegramForbiddenError:
-            typing_task.cancel()
-            user.remind_of_yourself = 0
-            await user.update_in_db()
-            await bot.send_message(DEBUG_CHAT, f"USER{id} заблокировал чатбота")
-            typing_task.cancel()
-            return
+        typing_task.cancel()
+        user.remind_of_yourself = 0
+        await user.update_in_db()
+        await bot.send_message(DEBUG_CHAT, f"USER{id} заблокировал чатбота")
+        typing_task.cancel()
+        return
     except Exception as e:
-        generated_message = await bot.send_message(
-            DEBUG_CHAT, f"LLM{message.chat.id} - {e}"
-        )
-        logger.error(f"LLM{message.chat.id} - {e}")
-        generated_message = await message.answer(
-            converted,
-        )
+        await bot.send_message(DEBUG_CHAT, f"LLM{message.chat.id} - {e}")
+        await message.answer(converted)
+
     typing_task.cancel()
     user.remind_of_yourself = await user_db.time_after(
         DELAYED_REMINDERS_HOURS,
@@ -350,8 +340,8 @@ async def LLM_request(message: types.Message):
         TO_TIME,
     )
     await user.update_in_db()
-    await f_debug(message.chat.id, generated_message.message_id)
-    logger.info(f"LLM{message.chat.id} - {generated_message.text}")
+    
+    logger.info(f"LLM{message.chat.id} - {converted}")
 
 @dp.message()
 async def unknown_message(message: types.Message):
@@ -388,11 +378,16 @@ async def reminder():
         )
 
         try:
-            generated_message = await bot.send_message(
-                chat_id=id,
-                text=converted,
-                parse_mode=ParseMode.MARKDOWN_V2,
-            )
+            start = 0
+            while start < len(converted):
+                chunk = converted[start:start + 4096]
+                generated_message = await bot.send_message(
+                    chat_id=id,
+                    text=chunk,
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                )
+                start += 4096
+            
         except TelegramForbiddenError:
             typing_task.cancel()
             user.remind_of_yourself = 0
