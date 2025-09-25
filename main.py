@@ -398,10 +398,15 @@ async def reminder():
         except Exception as e:
             await bot.send_message(DEBUG_CHAT, f"LLM{id} - {e}")
             logger.error(f"LLM{id} - {e}")
-            generated_message = await bot.send_message(
-                chat_id=id,
-                text=converted,
-            )
+            start = 0
+            while start < len(converted):
+                chunk = converted[start:start + 4096]
+                generated_message = await bot.send_message(
+                    chat_id=id,
+                    text=chunk,
+                )
+                start += 4096
+                await f_debug(id, generated_message.message_id)
         typing_task.cancel()
         user.remind_of_yourself = await user_db.time_after(
             DELAYED_REMINDERS_HOURS,
@@ -411,7 +416,6 @@ async def reminder():
             TO_TIME,
         )
         await user.update_in_db()
-        await f_debug(id, generated_message.message_id)
         logger.info(f"LLM{id}REMINDER - {generated_message.text}")
 
 
@@ -420,15 +424,31 @@ async def main():
         print(await user_db.check_db())
         print("Основная часть запущена")
         print("Отладка:\n")
+
         polling_task = asyncio.create_task(dp.start_polling(bot))
+
         while True:
             await reminder()
             await asyncio.sleep(30)
+
     except Exception as e:
         print(f"Ошибка: {e}")
-        await bot.send_message(DEBUG_CHAT, f"Произошла ошибка:'{e}'")
-        logger.debug(f"CRITICAL_ERROR:{e}")
+        await bot.send_message(DEBUG_CHAT, f"Произошла ошибка: '{e}'")
+        logger.critical(f"CRITICAL_ERROR: {e}", exc_info=True)
+        raise  
+
+
+async def run_with_restart():
+    while True:
+        try:
+            await main()
+        except Exception as e:
+            print(f"main() завершился с ошибкой: {e}. Перезапуск...")
+            
+            await asyncio.sleep(5)  
+        else:
+            break
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(run_with_restart())
