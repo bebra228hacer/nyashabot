@@ -284,7 +284,6 @@ async def LLM_request(message: types.Message):
     await bot.send_message(DEBUG_CHAT, f"USER{message.chat.id}:")
     logger.info(f"USER{message.chat.id}TOLLM:{message.text}")
     await f_debug(message.chat.id, message.message_id)
-
     typing_task = asyncio.create_task(keep_typing(message.chat.id))
     user = User(message.chat.id)
     await user.get_from_db()
@@ -317,20 +316,24 @@ async def LLM_request(message: types.Message):
         start = 0
         while start < len(converted):
             chunk = converted[start:start + 4096]
-            message = await message.answer(chunk, parse_mode=ParseMode.MARKDOWN_V2)
+            generated_message = await message.answer(chunk, parse_mode=ParseMode.MARKDOWN_V2)
             start += 4096
-            
+            await f_debug(message.chat.id, generated_message.message_id)
     except TelegramForbiddenError:
-        typing_task.cancel()
         user.remind_of_yourself = 0
         await user.update_in_db()
         await bot.send_message(DEBUG_CHAT, f"USER{id} заблокировал чатбота")
         typing_task.cancel()
         return
     except Exception as e:
+        start = 0
+        while start < len(llm_msg):
+            chunk = converted[start:start + 4096]
+            generated_message = await message.answer(chunk, parse_mode=ParseMode.MARKDOWN_V2)
+            start += 4096
+            await f_debug(message.chat.id, generated_message.message_id)
         await bot.send_message(DEBUG_CHAT, f"LLM{message.chat.id} - {e}")
-        await message.answer(converted)
-
+        typing_task.cancel()
     typing_task.cancel()
     user.remind_of_yourself = await user_db.time_after(
         DELAYED_REMINDERS_HOURS,
@@ -359,7 +362,6 @@ async def reminder():
         prompt_for_request = user.prompt.copy()
         prompt_for_request.append({"role": "system", "content": REMINDER_PROMPT.replace("{CURRENTDATE}", datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S"))})
         prompt_for_request.insert(0, ({"role": "system", "content": DEFAULT_PROMPT}))
-        typing_task = asyncio.create_task(keep_typing(id))
         try:
             llm_msg = await send_request_to_openrouter(prompt_for_request)
         except Exception as e:
@@ -387,13 +389,11 @@ async def reminder():
                     parse_mode=ParseMode.MARKDOWN_V2,
                 )
                 start += 4096
-            
+                await f_debug(id, generated_message.message_id)
         except TelegramForbiddenError:
-            typing_task.cancel()
             user.remind_of_yourself = 0
             await user.update_in_db()
             await bot.send_message(DEBUG_CHAT, f"USER{id} заблокировал чатбота")
-            typing_task.cancel()
             return
         except Exception as e:
             await bot.send_message(DEBUG_CHAT, f"LLM{id} - {e}")
@@ -407,7 +407,6 @@ async def reminder():
                 )
                 start += 4096
                 await f_debug(id, generated_message.message_id)
-        typing_task.cancel()
         user.remind_of_yourself = await user_db.time_after(
             DELAYED_REMINDERS_HOURS,
             DELAYED_REMINDERS_MINUTES,
